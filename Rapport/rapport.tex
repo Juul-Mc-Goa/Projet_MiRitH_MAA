@@ -5,10 +5,31 @@
 
 \documentclass{article}
 
-\author{Maxime Coute}
+\title{Projet MiRitH}
+\author{Maxime Coute \and Jules Magois}
 
 \begin{document}
+\maketitle
 
-Bonjour.
+\section{Proposition de structure du code}
+
+\begin{enumerate}
+  \item un fichier \verb!matrix.c! pour gérer les opérations sur les matrices:
+        \begin{itemize}
+          \item allocation de mémoire
+          \item libération de mémoire
+          \item addition de deux (ou une liste de) matrices
+          \item multiplication de deux matrices
+        \end{itemize}
+  \item un fichier \verb!key_generation.c! pour générer la clé,
+  \item un fichier \verb!party.c! qui implémente les calculs de chaque partie,
+  \item un fichier \verb!main.c! qui implémente la signature.
+\end{enumerate}
+
+\section{Bibliothèques utilisées}
+\begin{enumerate}
+  \item \verb!gmp! pour la génération de nombres aléatoires, et les calculs sur les grands entiers,
+    \item \verb!openssl! pour l'utilisation du hash \emph{Keccak}.
+\end{enumerate}
 
 \end{document}

@@ -1,11 +1,12 @@
-#include "gmp.h"
-#include <openssl/evp.h>
+#include "key_generation.h"
+#include <gmp.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
 
-int main(int argc, char **argv) {
-  EVP_MD_CTX *ctx = NULL;
-  EVP_MD *sha256 = NULL;
+int test_keccak_digest() {
+  EVP_MD_CTX *ctx = NULL; // Message Digest context
+  EVP_MD *keccak = NULL;
   const unsigned char msg[] = {0x00, 0x01, 0x02, 0x03};
   unsigned int len = 0;
   unsigned char *outdigest = NULL;
@@ -17,20 +18,16 @@ int main(int argc, char **argv) {
     goto err;
 
   /*
-   * Fetch the SHA256 algorithm implementation for doing the digest. We're
-   * using the "default" library context here (first NULL parameter), and
-   * we're not supplying any particular search criteria for our SHA256
-   * implementation (second NULL parameter). Any SHA256 implementation will
-   * do.
-   * In a larger application this fetch would just be done once, and could
-   * be used for multiple calls to other operations such as EVP_DigestInit_ex().
+   * Fetch the KECCAK algorithm implementation for doing the digest.
+   * - first NULL param: use the "default" library context
+   * - second NULL param: no particular criteria for the implementation
    */
-  sha256 = EVP_MD_fetch(NULL, "SHA256", NULL);
-  if (sha256 == NULL)
+  keccak = EVP_MD_fetch(NULL, "KECCAK-224", NULL);
+  if (keccak == NULL)
     goto err;
 
   /* Initialise the digest operation */
-  if (!EVP_DigestInit_ex(ctx, sha256, NULL))
+  if (!EVP_DigestInit_ex(ctx, keccak, NULL))
     goto err;
 
   /*
@@ -41,7 +38,7 @@ int main(int argc, char **argv) {
     goto err;
 
   /* Allocate the output buffer */
-  outdigest = OPENSSL_malloc(EVP_MD_get_size(sha256));
+  outdigest = OPENSSL_malloc(EVP_MD_get_size(keccak));
   if (outdigest == NULL)
     goto err;
 
@@ -57,9 +54,20 @@ int main(int argc, char **argv) {
 err:
   /* Clean up all the resources we allocated */
   OPENSSL_free(outdigest);
-  EVP_MD_free(sha256);
+  EVP_MD_free(keccak);
   EVP_MD_CTX_free(ctx);
   if (ret != 0)
     ERR_print_errors_fp(stderr);
   return ret;
+}
+
+int main(int argc, char **argv) {
+  uint lambda = 4;
+  bool *seed = allocate_seed(lambda);
+  generate_seed(seed, lambda);
+
+  printf("generated seed:\n");
+  for (uint i = 0; i < 4; i++) {
+    printf("%u: %u\n", i, seed[i]);
+  }
 }
