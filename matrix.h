@@ -19,7 +19,7 @@ typedef struct Matrix {
 void allocate_matrix(Matrix m, MatrixSize size);
 void clear_matrix(Matrix m);
 void scalar_product(Matrix result, mpz_t scalar, Matrix m);
-void matrix_sum(Matrix result, Matrix *summands);
+void matrix_sum(Matrix result, Matrix *summands, uint k);
 void matrix_product(Matrix result, Matrix m_left, Matrix m_right);
 
 #endif // MATRIX_H_

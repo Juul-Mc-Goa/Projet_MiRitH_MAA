@@ -115,12 +115,13 @@ PublicPrivateKeyPair key_gen(uint lambda, uint prime_length, MatrixSize size) {
 
   // 2.3. gmp random integer generation
   // TODO: - generate with `public_seed`:
-  //         - k matrices M_1, ... M_k (of size (m, n))
+  //         - k matrices M_1, ... M_k of size (m, n)
   //       - generate with `private seed`:
   //         - a vector alpha of size k
   //         - a matrix K of size (r, n - r)
   //         - a matrix E' of size (m, r)
 
+  // clear gmp random state
   gmp_randclear(random_state);
 
   return result;
