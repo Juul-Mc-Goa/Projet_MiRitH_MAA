@@ -9,9 +9,11 @@ typedef unsigned int uint;
 
 // A struct holding all the parameters for the signature
 typedef struct SignatureParameters {
-  uint lambda;
-  MatrixSize matrix_dimension;
-  mpz_t moduli;
+  uint lambda;                 // security parameter
+  MatrixSize matrix_dimension; // dimension (m, n) of the full matrices
+  uint prime_bit_count; // the size of the prime defining the finite field
+  uint target_rank;     // rank `r` of the solution
+  uint solution_size;   // size `k` of the solution vector
 } SignatureParameters;
 
 // A struct holding
@@ -38,6 +40,6 @@ void generate_prime(mpz_t result, uint lambda);
 
 PublicPrivateKeyPair allocate_key_pair(SignatureParameters parameters);
 void clear_key_pair(PublicPrivateKeyPair key_pair);
-PublicPrivateKeyPair key_gen(uint lambda, uint prime_length, MatrixSize size);
+PublicPrivateKeyPair key_gen(SignatureParameters params);
 
 #endif // KEY_GENERATION_H_

@@ -1,4 +1,5 @@
 #include "key_generation.h"
+#include "matrix.h"
 #include <gmp.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -70,4 +71,32 @@ int main(int argc, char **argv) {
   for (uint i = 0; i < 4; i++) {
     printf("%u: %u\n", i, seed[i]);
   }
+
+  MatrixSize size;
+  size.m = 3;
+  size.n = 3;
+  uint **matrix = malloc(size.m * sizeof(uint *));
+  matrix[0] = malloc(size.n * sizeof(uint));
+  matrix[1] = malloc(size.n * sizeof(uint));
+  matrix[2] = malloc(size.n * sizeof(uint));
+
+  matrix[0][0] = 1;
+  matrix[0][1] = 0;
+  matrix[0][2] = 0;
+
+  matrix[1][0] = 0;
+  matrix[1][1] = 1;
+  matrix[1][2] = 0;
+
+  matrix[2][0] = 0;
+  matrix[2][1] = 0;
+  matrix[2][2] = 1;
+
+  Matrix m;
+  allocate_matrix(&m, size);
+  matrix_set_ui(&m, matrix);
+
+  print_matrix(&m);
+  clear_matrix(&m);
+  free(matrix);
 }
