@@ -79,12 +79,12 @@ void clear_key_pair(PublicPrivateKeyPair key_pair) {
   clear_matrix(&key_pair.public_key.m0);
 }
 
-void generate_random_matrix(Matrix m, gmp_randstate_t random_state,
+void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
                             uint bit_count) {
-  for (uint i = 0; i < m.size.m; i++) {
-    for (uint j = 0; j < m.size.n; j++) {
-      mpz_urandomb(m.data[i][j], random_state, bit_count);
-      mpz_mod(m.data[i][j], m.data[i][j], m.moduli);
+  for (uint i = 0; i < m->size.m; i++) {
+    for (uint j = 0; j < m->size.n; j++) {
+      mpz_urandomb(m->data[i][j], random_state, bit_count);
+      mpz_mod(m->data[i][j], m->data[i][j], m->moduli);
     }
   }
 }
@@ -118,7 +118,6 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
 
   // 2.2. gmp random state seeding
   char *seed_str = malloc(lambda * sizeof(char));
-  seed_as_string(seed_str, lambda, public_seed);
 
   mpz_t seed;
   mpz_init(seed);
@@ -154,7 +153,7 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   allocate_matrix(&m_i, params.matrix_dimension);
   for (uint i = 1; i <= params.solution_size; i++) {
     // generate M_i
-    generate_random_matrix(m_i, public_random_state, params.prime_bit_count);
+    generate_random_matrix(&m_i, public_random_state, params.prime_bit_count);
 
     // generate alpha_i
     mpz_init(alpha[i]);

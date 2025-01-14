@@ -92,6 +92,7 @@ uint **rotation_matrix(MatrixSize size) {
 }
 
 void test_matrix_sum() {
+  printf("------------------------------ beginning matrix sum test...\n");
   MatrixSize size;
   size.m = 5;
   size.n = 5;
@@ -127,6 +128,7 @@ void test_matrix_sum() {
 }
 
 void test_matrix_prod() {
+  printf("------------------------------ beginning matrix product test...\n");
   MatrixSize size;
   size.m = 5;
   size.n = 5;
@@ -161,6 +163,24 @@ void test_matrix_prod() {
   free(rotation);
 }
 
+void test_random_matrix() {
+  printf("------------------------------ beginning random matrix test...\n");
+  Matrix m;
+  m.size.m = 4;
+  m.size.n = 4;
+  allocate_matrix(&m, m.size);
+
+  gmp_randstate_t random_state;
+  gmp_randinit_default(random_state);
+  generate_prime(m.moduli, 5);
+
+  generate_random_matrix(&m, random_state, 4);
+  print_matrix(&m);
+
+  clear_matrix(&m);
+  gmp_randclear(random_state);
+}
+
 int main(int argc, char **argv) {
   // seed generation
   uint lambda = 4;
@@ -181,4 +201,5 @@ int main(int argc, char **argv) {
   // matrices
   test_matrix_sum();
   test_matrix_prod();
+  test_random_matrix();
 }

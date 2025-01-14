@@ -37,6 +37,8 @@ bool *allocate_seed(uint lambda);
 void generate_seed(bool *seed, uint lambda);
 
 void generate_prime(mpz_t result, uint lambda);
+void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
+                            uint bit_count);
 
 PublicPrivateKeyPair allocate_key_pair(SignatureParameters parameters);
 void clear_key_pair(PublicPrivateKeyPair key_pair);
