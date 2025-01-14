@@ -62,7 +62,107 @@ err:
   return ret;
 }
 
+uint **identity_matrix(MatrixSize size) {
+  uint **result = malloc(size.m * sizeof(uint *));
+  for (uint i = 0; i < size.m; i++) {
+    result[i] = malloc(size.n * sizeof(uint));
+    for (uint j = 0; j < size.n; j++) {
+      result[i][j] = (i == j) ? 1 : 0;
+    }
+  }
+
+  return result;
+}
+
+uint **rotation_matrix(MatrixSize size) {
+  uint **result = malloc(size.m * sizeof(uint *));
+  for (uint i = 0; i < size.m; i++) {
+    result[i] = malloc(size.n * sizeof(uint));
+    for (uint j = 0; j < size.n; j++) {
+      if ((j + 1) % size.n == i) {
+        result[i][j] = 1;
+
+      } else {
+        result[i][j] = 0;
+      }
+    }
+  }
+
+  return result;
+}
+
+void test_matrix_sum() {
+  MatrixSize size;
+  size.m = 5;
+  size.n = 5;
+
+  uint **identity = identity_matrix(size);
+  uint **rotation = rotation_matrix(size);
+
+  Matrix m_id;
+  allocate_matrix(&m_id, size);
+  matrix_init_set_ui(&m_id, identity);
+
+  printf("Id matrix:\n");
+  print_matrix(&m_id);
+
+  Matrix m_rot;
+  allocate_matrix(&m_rot, size);
+  matrix_init_set_ui(&m_rot, rotation);
+
+  printf("circular permutation matrix:\n");
+  print_matrix(&m_rot);
+
+  Matrix m_sum;
+  allocate_matrix(&m_sum, size);
+  matrix_sum(&m_sum, m_id, m_rot);
+  printf("matrix sum (Id + Rot):\n");
+  print_matrix(&m_sum);
+
+  clear_matrix(&m_id);
+  clear_matrix(&m_rot);
+  clear_matrix(&m_sum);
+  free(identity);
+  free(rotation);
+}
+
+void test_matrix_prod() {
+  MatrixSize size;
+  size.m = 5;
+  size.n = 5;
+
+  uint **identity = identity_matrix(size);
+  uint **rotation = rotation_matrix(size);
+
+  Matrix m_id;
+  allocate_matrix(&m_id, size);
+  matrix_init_set_ui(&m_id, identity);
+
+  printf("Id matrix:\n");
+  print_matrix(&m_id);
+
+  Matrix m_rot;
+  allocate_matrix(&m_rot, size);
+  matrix_init_set_ui(&m_rot, rotation);
+
+  printf("circular permutation matrix:\n");
+  print_matrix(&m_rot);
+
+  Matrix m_prod;
+  allocate_matrix(&m_prod, size);
+  matrix_product(&m_prod, m_rot, m_rot);
+  printf("matrix product (Rot * Rot):\n");
+  print_matrix(&m_prod);
+
+  clear_matrix(&m_id);
+  clear_matrix(&m_rot);
+  clear_matrix(&m_prod);
+  free(identity);
+  free(rotation);
+}
+
 int main(int argc, char **argv) {
+  // seed generation
   uint lambda = 4;
   bool *seed = allocate_seed(lambda);
   generate_seed(seed, lambda);
@@ -72,31 +172,13 @@ int main(int argc, char **argv) {
     printf("%u: %u\n", i, seed[i]);
   }
 
-  MatrixSize size;
-  size.m = 3;
-  size.n = 3;
-  uint **matrix = malloc(size.m * sizeof(uint *));
-  matrix[0] = malloc(size.n * sizeof(uint));
-  matrix[1] = malloc(size.n * sizeof(uint));
-  matrix[2] = malloc(size.n * sizeof(uint));
+  // prime generation
+  mpz_t prime;
+  mpz_init(prime);
+  generate_prime(prime, 5);
+  gmp_printf("generated prime: %Zd\n", prime);
 
-  matrix[0][0] = 1;
-  matrix[0][1] = 0;
-  matrix[0][2] = 0;
-
-  matrix[1][0] = 0;
-  matrix[1][1] = 1;
-  matrix[1][2] = 0;
-
-  matrix[2][0] = 0;
-  matrix[2][1] = 0;
-  matrix[2][2] = 1;
-
-  Matrix m;
-  allocate_matrix(&m, size);
-  matrix_set_ui(&m, matrix);
-
-  print_matrix(&m);
-  clear_matrix(&m);
-  free(matrix);
+  // matrices
+  test_matrix_sum();
+  test_matrix_prod();
 }

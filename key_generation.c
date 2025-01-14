@@ -68,7 +68,7 @@ PublicPrivateKeyPair allocate_key_pair(SignatureParameters parameters) {
 
   result.public_key.lambda = parameters.lambda;
   result.public_key.seed = malloc(parameters.lambda * sizeof(bool));
-  allocate_matrix(result.public_key.m0, parameters.matrix_dimension);
+  allocate_matrix(&result.public_key.m0, parameters.matrix_dimension);
 
   return result;
 }
@@ -76,7 +76,7 @@ PublicPrivateKeyPair allocate_key_pair(SignatureParameters parameters) {
 void clear_key_pair(PublicPrivateKeyPair key_pair) {
   free(key_pair.private_key);
   free(key_pair.public_key.seed);
-  clear_matrix(key_pair.public_key.m0);
+  clear_matrix(&key_pair.public_key.m0);
 }
 
 void generate_random_matrix(Matrix m, gmp_randstate_t random_state,
@@ -106,7 +106,7 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
 
   // 2. random matrix generation
   Matrix m0;
-  allocate_matrix(m0, params.matrix_dimension);
+  allocate_matrix(&m0, params.matrix_dimension);
   generate_prime(m0.moduli, params.prime_bit_count);
 
   // 2.1. gmp random state initialization
@@ -147,11 +147,11 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   mpz_init_set_ui(alpha[0], 1);
 
   Matrix sum;
-  allocate_matrix(sum, params.matrix_dimension);
-  fill_matrix_with_zero(sum);
+  allocate_matrix(&sum, params.matrix_dimension);
+  fill_matrix_with_zero(&sum);
 
   Matrix m_i;
-  allocate_matrix(m_i, params.matrix_dimension);
+  allocate_matrix(&m_i, params.matrix_dimension);
   for (uint i = 1; i <= params.solution_size; i++) {
     // generate M_i
     generate_random_matrix(m_i, public_random_state, params.prime_bit_count);
@@ -161,13 +161,13 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
     mpz_urandomb(alpha[i], private_random_state, params.prime_bit_count);
 
     // compute sum -= alpha_i * M_i
-    scalar_product(m_i, alpha[i], m_i);
-    matrix_opposite(m_i);
-    matrix_sum(sum, sum, m_i);
+    scalar_product(&m_i, alpha[i], m_i);
+    matrix_opposite(&m_i);
+    matrix_sum(&sum, sum, m_i);
   }
 
-  clear_matrix(sum);
-  clear_matrix(m_i);
+  clear_matrix(&sum);
+  clear_matrix(&m_i);
   gmp_randclear(public_random_state);
   gmp_randclear(private_random_state);
 

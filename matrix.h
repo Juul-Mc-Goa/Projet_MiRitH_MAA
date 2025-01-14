@@ -17,7 +17,8 @@ typedef struct Matrix {
 } Matrix;
 
 void allocate_matrix(Matrix *m, MatrixSize size);
-void matrix_set_ui(Matrix *m, uint **uint_matrix);
+void matrix_init_set_ui(Matrix *m, uint **uint_matrix);
+void matrix_init_set(Matrix *m, Matrix src_matrix);
 void fill_matrix_with_zero(Matrix *m);
 void print_matrix(Matrix *m);
 void clear_matrix(Matrix *m);

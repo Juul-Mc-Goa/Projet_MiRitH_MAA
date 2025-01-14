@@ -6,10 +6,8 @@
 typedef unsigned int uint;
 
 void allocate_matrix(Matrix *result, MatrixSize size) {
-  printf("input size: (%u, %u)\n", size.m, size.n);
   result->size.m = size.m;
   result->size.n = size.n;
-  printf("result size: (%u, %u)\n", result->size.m, result->size.n);
   result->data = malloc(size.m * sizeof(mpz_t *));
 
   for (uint i = 0; i < size.m; i++) {
@@ -34,7 +32,15 @@ void clear_matrix(Matrix *m) {
   free(m->data);
 }
 
-void matrix_set_ui(Matrix *m, uint **uint_matrix) {
+void matrix_init_set(Matrix *m, Matrix src_matrix) {
+  for (uint i = 0; i < m->size.m; i++) {
+    for (uint j = 0; j < m->size.n; j++) {
+      mpz_init_set(m->data[i][j], src_matrix.data[i][j]);
+    }
+  }
+}
+
+void matrix_init_set_ui(Matrix *m, uint **uint_matrix) {
   for (uint i = 0; i < m->size.m; i++) {
     for (uint j = 0; j < m->size.n; j++) {
       mpz_init_set_ui(m->data[i][j], uint_matrix[i][j]);
@@ -51,7 +57,6 @@ void fill_matrix_with_zero(Matrix *m) {
 }
 
 void print_matrix(Matrix *m) {
-  printf("printing matrix of size (%u, %u)\n", m->size.m, m->size.n);
   for (uint i = 0; i < m->size.m; i++) {
     for (uint j = 0; j < m->size.n; j++) {
       gmp_printf("%Zd ", m->data[i][j]);
