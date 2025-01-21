@@ -93,19 +93,15 @@ void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
 PublicPrivateKeyPair key_gen(SignatureParameters params) {
   uint lambda = params.lambda;
   PublicPrivateKeyPair result;
-  result.lambda = lambda;
-  result.public_key.lambda = lambda;
 
   // private key generation
   bool *private_seed = allocate_seed(lambda);
   generate_seed(private_seed, lambda);
-  result.private_key = private_seed;
 
   // public key generation
   // 1. seed generation
   bool *public_seed = allocate_seed(lambda);
   generate_seed(public_seed, lambda);
-  result.public_key.seed = public_seed;
 
   // 2. random matrix generation
   // 2.1. gmp random state initialization
@@ -209,6 +205,11 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   clear_matrix(&E);
   gmp_randclear(public_random_state);
   gmp_randclear(private_random_state);
+
+  result.lambda = lambda;
+  result.public_key.lambda = lambda;
+  result.public_key.seed = public_seed;
+  result.private_key = private_seed;
 
   return result;
 }
