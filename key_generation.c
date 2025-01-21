@@ -90,18 +90,49 @@ void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
   }
 }
 
+SignatureParameters parameters_1_a_fast() {
+  SignatureParameters result;
+  result.lambda = 128;
+  result.field = gf_16();
+  result.matrix_dimension.m = 15;
+  result.matrix_dimension.n = 15;
+  result.solution_size = 78;
+  result.target_rank = 6;
+  result.first_challenge_size = 5;
+  result.number_of_parties = 16;
+  result.tau = 39;
+
+  return result;
+}
+
+SignatureParameters parameters_1_a_short() {
+  SignatureParameters result;
+  result.lambda = 128;
+  result.field = gf_16();
+  result.matrix_dimension.m = 15;
+  result.matrix_dimension.n = 15;
+  result.solution_size = 78;
+  result.target_rank = 6;
+  result.first_challenge_size = 9;
+  result.number_of_parties = 256;
+  result.tau = 19;
+
+  return result;
+}
+
 PublicPrivateKeyPair key_gen(SignatureParameters params) {
   uint lambda = params.lambda;
   PublicPrivateKeyPair result;
+  allocate_key_pair(&result, params);
+  result.lambda = lambda;
+  result.public_key.lambda = lambda;
 
   // private key generation
-  bool *private_seed = allocate_seed(lambda);
-  generate_seed(private_seed, lambda);
+  generate_seed(result.private_key, lambda);
 
   // public key generation
   // 1. seed generation
-  bool *public_seed = allocate_seed(lambda);
-  generate_seed(public_seed, lambda);
+  generate_seed(result.public_key.seed, lambda);
 
   // 2. random matrix generation
   // 2.1. gmp random state initialization
