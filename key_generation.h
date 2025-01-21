@@ -1,8 +1,8 @@
 #ifndef KEY_GENERATION_H_
 #define KEY_GENERATION_H_
 
-#include "matrix.h"
 #include "field_arithmetics.h"
+#include "matrix.h"
 #include <gmp.h>
 #include <stdbool.h>
 
@@ -43,7 +43,8 @@ void generate_seed(bool *seed, uint lambda);
 void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
                             uint field_size);
 
-PublicPrivateKeyPair allocate_key_pair(SignatureParameters parameters);
+void allocate_key_pair(PublicPrivateKeyPair *key_pair,
+                       SignatureParameters parameters);
 void clear_key_pair(PublicPrivateKeyPair key_pair);
 PublicPrivateKeyPair key_gen(SignatureParameters params);
 

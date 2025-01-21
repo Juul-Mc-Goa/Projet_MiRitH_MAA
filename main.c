@@ -189,4 +189,18 @@ int main(int argc, char **argv) {
   test_matrix_sum();
   test_matrix_prod();
   test_random_matrix();
+
+  // key generation
+  SignatureParameters params;
+  params.lambda = 4;
+  params.matrix_dimension.m = 3;
+  params.matrix_dimension.n = 3;
+  params.field = gf_16();
+  params.target_rank = 1;
+  params.solution_size = 4;
+  params.first_challenge_size = 2;
+  params.number_of_parties = 2;
+  params.tau = 2;
+
+  PublicPrivateKeyPair key_pair = key_gen(params);
 }

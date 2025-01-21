@@ -1,4 +1,5 @@
 #include "key_generation.h"
+#include "field_arithmetics.h"
 #include "matrix.h"
 #include <gmp.h>
 #include <stdbool.h>
@@ -50,17 +51,15 @@ void seed_as_string(char *result, uint lambda, bool *seed) {
   }
 }
 
-PublicPrivateKeyPair allocate_key_pair(SignatureParameters params) {
-  PublicPrivateKeyPair result;
+void allocate_key_pair(PublicPrivateKeyPair *key_pair,
+                       SignatureParameters params) {
+  key_pair->lambda = params.lambda;
+  key_pair->private_key = malloc(params.lambda * sizeof(bool));
 
-  result.lambda = params.lambda;
-  result.private_key = malloc(params.lambda * sizeof(bool));
-
-  result.public_key.lambda = params.lambda;
-  result.public_key.seed = malloc(params.lambda * sizeof(bool));
-  allocate_matrix(&result.public_key.m0, params.field, params.matrix_dimension);
-
-  return result;
+  key_pair->public_key.lambda = params.lambda;
+  key_pair->public_key.seed = malloc(params.lambda * sizeof(bool));
+  allocate_matrix(&key_pair->public_key.m0, params.field,
+                  params.matrix_dimension);
 }
 
 void clear_key_pair(PublicPrivateKeyPair key_pair) {
@@ -144,17 +143,16 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
 
   // 2.2. gmp random state seeding
   char *seed_str = malloc(lambda * sizeof(char));
-
   mpz_t seed;
   mpz_init(seed);
 
   // public seed
-  seed_as_string(seed_str, lambda, public_seed);
+  seed_as_string(seed_str, lambda, result.public_key.seed);
   mpz_set_str(seed, seed_str, 2);
   gmp_randseed(public_random_state, seed);
 
   // private seed
-  seed_as_string(seed_str, lambda, private_seed);
+  seed_as_string(seed_str, lambda, result.private_key);
   mpz_set_str(seed, seed_str, 2);
   gmp_randseed(private_random_state, seed);
 
@@ -162,7 +160,7 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
 
   // 2.3. gmp random integer generation
   // 2.3.1 generate M_1, ..., M_k, and field elements alpha_1, ..., alpha_k,
-  // then store sum = alpha_1 * M_1 + ... + alpha_k * M_k
+  //       then store sum = alpha_1 * M_1 + ... + alpha_k * M_k
   uint *alpha = malloc(params.solution_size * sizeof(uint));
   alpha[0] = 1;
 
@@ -236,11 +234,6 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   clear_matrix(&E);
   gmp_randclear(public_random_state);
   gmp_randclear(private_random_state);
-
-  result.lambda = lambda;
-  result.public_key.lambda = lambda;
-  result.public_key.seed = public_seed;
-  result.private_key = private_seed;
 
   return result;
 }
