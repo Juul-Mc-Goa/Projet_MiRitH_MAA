@@ -50,25 +50,15 @@ void seed_as_string(char *result, uint lambda, bool *seed) {
   }
 }
 
-void generate_prime(mpz_t result, uint bit_length) {
-  gmp_randstate_t random_state;
-  gmp_randinit_default(random_state);
-
-  mpz_urandomb(result, random_state, bit_length);
-  mpz_nextprime(result, result);
-
-  gmp_randclear(random_state);
-}
-
-PublicPrivateKeyPair allocate_key_pair(SignatureParameters parameters) {
+PublicPrivateKeyPair allocate_key_pair(SignatureParameters params) {
   PublicPrivateKeyPair result;
 
-  result.lambda = parameters.lambda;
-  result.private_key = malloc(parameters.lambda * sizeof(bool));
+  result.lambda = params.lambda;
+  result.private_key = malloc(params.lambda * sizeof(bool));
 
-  result.public_key.lambda = parameters.lambda;
-  result.public_key.seed = malloc(parameters.lambda * sizeof(bool));
-  allocate_matrix(&result.public_key.m0, parameters.matrix_dimension);
+  result.public_key.lambda = params.lambda;
+  result.public_key.seed = malloc(params.lambda * sizeof(bool));
+  allocate_matrix(&result.public_key.m0, params.field, params.matrix_dimension);
 
   return result;
 }
@@ -79,12 +69,23 @@ void clear_key_pair(PublicPrivateKeyPair key_pair) {
   clear_matrix(&key_pair.public_key.m0);
 }
 
+uint generate_random_element(gmp_randstate_t random_state,
+                             uint log_field_size) {
+
+  mpz_t temp;
+  mpz_init(temp);
+  mpz_urandomb(temp, random_state, log_field_size);
+
+  uint result = mpz_get_ui(temp);
+
+  return result;
+}
+
 void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
-                            uint bit_count) {
+                            uint log_field_size) {
   for (uint i = 0; i < m->size.m; i++) {
     for (uint j = 0; j < m->size.n; j++) {
-      mpz_urandomb(m->data[i][j], random_state, bit_count);
-      mpz_mod(m->data[i][j], m->data[i][j], m->moduli);
+      m->data[i][j] = generate_random_element(random_state, log_field_size);
     }
   }
 }
@@ -93,6 +94,7 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   uint lambda = params.lambda;
   PublicPrivateKeyPair result;
   result.lambda = lambda;
+  result.public_key.lambda = lambda;
 
   // private key generation
   bool *private_seed = allocate_seed(lambda);
@@ -103,12 +105,9 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   // 1. seed generation
   bool *public_seed = allocate_seed(lambda);
   generate_seed(public_seed, lambda);
+  result.public_key.seed = public_seed;
 
   // 2. random matrix generation
-  Matrix m0;
-  allocate_matrix(&m0, params.matrix_dimension);
-  generate_prime(m0.moduli, params.prime_bit_count);
-
   // 2.1. gmp random state initialization
   gmp_randstate_t public_random_state;
   gmp_randinit_default(public_random_state);
@@ -135,38 +134,79 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   free(seed_str);
 
   // 2.3. gmp random integer generation
-  // TODO: - generate with `public_seed`:
-  //         - (DONE) k matrices M_1, ... M_k of size (m, n)
-  //       - generate with `private seed`:
-  //         - (DONE) a vector alpha of size k
-  //         - a matrix K of size (r, n - r)
-  //         - a matrix E' of size (m, r)
-
-  mpz_t *alpha = malloc(params.solution_size * sizeof(mpz_t));
-  mpz_init_set_ui(alpha[0], 1);
+  // 2.3.1 generate M_1, ..., M_k, and field elements alpha_1, ..., alpha_k,
+  // then store sum = alpha_1 * M_1 + ... + alpha_k * M_k
+  uint *alpha = malloc(params.solution_size * sizeof(uint));
+  alpha[0] = 1;
 
   Matrix sum;
-  allocate_matrix(&sum, params.matrix_dimension);
+  allocate_matrix(&sum, params.field, params.matrix_dimension);
   fill_matrix_with_zero(&sum);
 
   Matrix m_i;
-  allocate_matrix(&m_i, params.matrix_dimension);
+  allocate_matrix(&m_i, params.field, params.matrix_dimension);
   for (uint i = 1; i <= params.solution_size; i++) {
     // generate M_i
-    generate_random_matrix(&m_i, public_random_state, params.prime_bit_count);
+    generate_random_matrix(&m_i, public_random_state, params.field.field_size);
 
     // generate alpha_i
-    mpz_init(alpha[i]);
-    mpz_urandomb(alpha[i], private_random_state, params.prime_bit_count);
+    alpha[i] = generate_random_element(private_random_state,
+                                       params.field.log_field_size);
 
-    // compute sum -= alpha_i * M_i
+    // compute sum += alpha_i * M_i
     scalar_product(&m_i, alpha[i], m_i);
-    matrix_opposite(&m_i);
     matrix_sum(&sum, sum, m_i);
   }
 
+  // 2.3.2 generate a random matrix K
+  Matrix K;
+  MatrixSize K_size;
+  K_size.m = params.target_rank;
+  K_size.n = params.matrix_dimension.n - params.target_rank;
+  allocate_matrix(&K, params.field, K_size);
+  generate_random_matrix(&K, private_random_state, params.field.log_field_size);
+
+  // 2.3.3 generate a random matrix E_R
+  Matrix E_R;
+  MatrixSize E_R_size;
+  E_R_size.m = params.matrix_dimension.m;
+  E_R_size.n = params.target_rank;
+  allocate_matrix(&E_R, params.field, E_R_size);
+  generate_random_matrix(&E_R, private_random_state,
+                         params.field.log_field_size);
+
+  // 2.3.4 compute E from K and E_R
+  Matrix E;
+  allocate_matrix(&E, params.field, params.matrix_dimension);
+
+  // left side: compute E_R * K
+  MatrixSize left_size;
+  left_size.m = E.size.m;
+  left_size.n = K_size.n;
+
+  Matrix E_L;
+  E_L.field = params.field;
+  E_L.size = left_size;
+  E_L.data = E.data;
+  matrix_product(&E_L, E_R, K);
+
+  // right side: copy E_R into E
+  for (uint i = 0; i < E.size.m; i++) {
+    for (uint j = K_size.n; j < E.size.n; j++) {
+      E.data[i][j] = E_R.data[i][j - K_size.n];
+    }
+  }
+
+  // 2.3.5 compute M_0 = E - sum: here field_size is a power of two, so -1 = 1,
+  // and M_0 = E + sum
+  allocate_matrix(&result.public_key.m0, params.field, params.matrix_dimension);
+  matrix_sum(&result.public_key.m0, E, sum);
+
   clear_matrix(&sum);
   clear_matrix(&m_i);
+  clear_matrix(&K);
+  clear_matrix(&E_R);
+  clear_matrix(&E);
   gmp_randclear(public_random_state);
   gmp_randclear(private_random_state);
 

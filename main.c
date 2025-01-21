@@ -1,3 +1,4 @@
+#include "field_arithmetics.h"
 #include "key_generation.h"
 #include "matrix.h"
 #include <gmp.h>
@@ -96,26 +97,27 @@ void test_matrix_sum() {
   MatrixSize size;
   size.m = 5;
   size.n = 5;
+  FiniteField field = gf_16();
 
   uint **identity = identity_matrix(size);
   uint **rotation = rotation_matrix(size);
 
   Matrix m_id;
-  allocate_matrix(&m_id, size);
-  matrix_init_set_ui(&m_id, identity);
+  allocate_matrix(&m_id, field, size);
+  copy_into_matrix(&m_id, identity);
 
   printf("Id matrix:\n");
   print_matrix(&m_id);
 
   Matrix m_rot;
-  allocate_matrix(&m_rot, size);
-  matrix_init_set_ui(&m_rot, rotation);
+  allocate_matrix(&m_rot, field, size);
+  copy_into_matrix(&m_rot, rotation);
 
   printf("circular permutation matrix:\n");
   print_matrix(&m_rot);
 
   Matrix m_sum;
-  allocate_matrix(&m_sum, size);
+  allocate_matrix(&m_sum, field, size);
   matrix_sum(&m_sum, m_id, m_rot);
   printf("matrix sum (Id + Rot):\n");
   print_matrix(&m_sum);
@@ -132,34 +134,25 @@ void test_matrix_prod() {
   MatrixSize size;
   size.m = 5;
   size.n = 5;
+  FiniteField field = gf_16();
 
-  uint **identity = identity_matrix(size);
   uint **rotation = rotation_matrix(size);
 
-  Matrix m_id;
-  allocate_matrix(&m_id, size);
-  matrix_init_set_ui(&m_id, identity);
-
-  printf("Id matrix:\n");
-  print_matrix(&m_id);
-
   Matrix m_rot;
-  allocate_matrix(&m_rot, size);
-  matrix_init_set_ui(&m_rot, rotation);
+  allocate_matrix(&m_rot, field, size);
+  copy_into_matrix(&m_rot, rotation);
 
   printf("circular permutation matrix:\n");
   print_matrix(&m_rot);
 
   Matrix m_prod;
-  allocate_matrix(&m_prod, size);
+  allocate_matrix(&m_prod, field, size);
   matrix_product(&m_prod, m_rot, m_rot);
   printf("matrix product (Rot * Rot):\n");
   print_matrix(&m_prod);
 
-  clear_matrix(&m_id);
   clear_matrix(&m_rot);
   clear_matrix(&m_prod);
-  free(identity);
   free(rotation);
 }
 
@@ -168,13 +161,13 @@ void test_random_matrix() {
   Matrix m;
   m.size.m = 4;
   m.size.n = 4;
-  allocate_matrix(&m, m.size);
+  FiniteField field = gf_16();
+  allocate_matrix(&m, field, m.size);
 
   gmp_randstate_t random_state;
   gmp_randinit_default(random_state);
-  generate_prime(m.moduli, 5);
 
-  generate_random_matrix(&m, random_state, 4);
+  generate_random_matrix(&m, random_state, field.log_field_size);
   print_matrix(&m);
 
   clear_matrix(&m);
@@ -191,12 +184,6 @@ int main(int argc, char **argv) {
   for (uint i = 0; i < 4; i++) {
     printf("%u: %u\n", i, seed[i]);
   }
-
-  // prime generation
-  mpz_t prime;
-  mpz_init(prime);
-  generate_prime(prime, 5);
-  gmp_printf("generated prime: %Zd\n", prime);
 
   // matrices
   test_matrix_sum();

@@ -2,6 +2,7 @@
 #define KEY_GENERATION_H_
 
 #include "matrix.h"
+#include "field_arithmetics.h"
 #include <gmp.h>
 #include <stdbool.h>
 
@@ -11,9 +12,12 @@ typedef unsigned int uint;
 typedef struct SignatureParameters {
   uint lambda;                 // security parameter
   MatrixSize matrix_dimension; // dimension (m, n) of the full matrices
-  uint prime_bit_count; // the size of the prime defining the finite field
-  uint target_rank;     // rank `r` of the solution
-  uint solution_size;   // size `k` of the solution vector
+  FiniteField field;           // the field used for computations
+  uint target_rank;            // the rank `r` of the solution
+  uint solution_size;          // the size `k` of the solution vector
+  uint first_challenge_size; // the number of columns `s` in the first challenge
+  uint number_of_parties;    // the number of parties `N`
+  uint tau;                  // the number of rounds
 } SignatureParameters;
 
 // A struct holding
@@ -36,9 +40,8 @@ typedef struct PublicPrivateKeyPair {
 bool *allocate_seed(uint lambda);
 void generate_seed(bool *seed, uint lambda);
 
-void generate_prime(mpz_t result, uint lambda);
 void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
-                            uint bit_count);
+                            uint field_size);
 
 PublicPrivateKeyPair allocate_key_pair(SignatureParameters parameters);
 void clear_key_pair(PublicPrivateKeyPair key_pair);
