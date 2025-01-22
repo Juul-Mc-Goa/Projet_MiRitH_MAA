@@ -155,6 +155,23 @@ void test_matrix_prod() {
   free(rotation);
 }
 
+void test_key_gen() {
+  printf("------------------------------ beginning key generation test...\n");
+  SignatureParameters params;
+  params.lambda = 4;
+  params.matrix_dimension.m = 3;
+  params.matrix_dimension.n = 3;
+  params.field = GF_16;
+  params.target_rank = 1;
+  params.solution_size = 4;
+  params.first_challenge_size = 2;
+  params.number_of_parties = 2;
+  params.tau = 2;
+
+  PublicPrivateKeyPair key_pair = key_gen(params);
+  printf("finished key generation.\n");
+}
+
 void test_random_matrix() {
   printf("------------------------------ beginning random matrix test...\n");
   Matrix m;
@@ -170,7 +187,7 @@ void test_random_matrix() {
   generate_seed(seed, lambda);
   seed_random_state(seed, lambda, random_state);
 
-  generate_random_matrix(&m, random_state, field.log_field_size);
+  generate_random_matrix(&m, random_state, field);
   print_matrix(&m);
 
   clear_matrix(&m);
@@ -195,24 +212,13 @@ int main(int argc, char **argv) {
   test_random_matrix();
 
   // key generation
-  SignatureParameters params;
-  params.lambda = 4;
-  params.matrix_dimension.m = 3;
-  params.matrix_dimension.n = 3;
-  params.field = GF_16;
-  params.target_rank = 1;
-  params.solution_size = 4;
-  params.first_challenge_size = 2;
-  params.number_of_parties = 2;
-  params.tau = 2;
-
-  PublicPrivateKeyPair key_pair = key_gen(params);
+  test_key_gen();
 
   // print addition table in GF(16)
-  printf("\n\n");
+  printf("\n\nAddition Table for GF(16):\n");
   print_gf_16_addition_table();
 
   // print multiplication table in GF(16)
-  printf("\n\n");
+  printf("\n\nMultiplication Table for GF(16):\n");
   print_gf_16_mul_table();
 }

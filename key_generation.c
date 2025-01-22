@@ -1,5 +1,5 @@
-#include "constants.h"
 #include "key_generation.h"
+#include "constants.h"
 #include "field_arithmetics.h"
 #include "matrix.h"
 #include <gmp.h>
@@ -82,11 +82,10 @@ void clear_key_pair(PublicPrivateKeyPair key_pair) {
   clear_matrix(&key_pair.public_key.m0);
 }
 
-uint generate_random_element(gmp_randstate_t random_state,
-                             uint log_field_size) {
+uint generate_random_element(gmp_randstate_t random_state, FiniteField field) {
   mpz_t temp;
   mpz_init(temp);
-  mpz_urandomb(temp, random_state, log_field_size);
+  mpz_urandomb(temp, random_state, field.log_field_size);
 
   uint result = mpz_get_ui(temp);
   mpz_clear(temp);
@@ -95,10 +94,11 @@ uint generate_random_element(gmp_randstate_t random_state,
 }
 
 void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
-                            uint log_field_size) {
+                            FiniteField field) {
   for (uint i = 0; i < m->size.m; i++) {
     for (uint j = 0; j < m->size.n; j++) {
-      m->data[i][j] = generate_random_element(random_state, log_field_size);
+      m->data[i][j] =
+          generate_random_element(random_state, field);
     }
   }
 }
@@ -137,15 +137,18 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   uint lambda = params.lambda;
   PublicPrivateKeyPair result;
   allocate_key_pair(&result, params);
+  printf("key allocated.\n");
 
   // private key generation
   result.private_key.lambda = lambda;
   generate_seed(result.private_key.seed, lambda);
+  printf("private seed generated.\n");
 
   // public key generation
   // 1. seed generation
   result.public_key.lambda = lambda;
   generate_seed(result.public_key.seed, lambda);
+  printf("public seed generated.\n");
 
   // 2. random matrix generation
   // 2.1. gmp random state initialization
@@ -155,11 +158,15 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   gmp_randstate_t private_random_state;
   gmp_randinit_default(private_random_state);
 
+  printf("random states initialized.\n");
+
   // 2.2. gmp random state seeding
   // public seed
   seed_random_state(result.public_key.seed, lambda, public_random_state);
   // private seed
   seed_random_state(result.private_key.seed, lambda, private_random_state);
+
+  printf("random states seeded.\n");
 
   // 2.3. gmp random integer generation
   // 2.3.1 generate M_1, ..., M_k, and field elements alpha_1, ..., alpha_k,
@@ -167,24 +174,29 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   uint *alpha = malloc(params.solution_size * sizeof(uint));
   alpha[0] = 1;
 
+  printf("allocated alpha.\n");
+
   Matrix sum;
   allocate_matrix(&sum, params.field, params.matrix_dimension);
   fill_matrix_with_zero(&sum);
+
+  printf("initialized `sum`.\n");
 
   Matrix m_i;
   allocate_matrix(&m_i, params.field, params.matrix_dimension);
   for (uint i = 1; i <= params.solution_size; i++) {
     // generate M_i
-    generate_random_matrix(&m_i, public_random_state, params.field.field_size);
+    generate_random_matrix(&m_i, public_random_state, params.field);
 
     // generate alpha_i
-    alpha[i] = generate_random_element(private_random_state,
-                                       params.field.log_field_size);
+    alpha[i] = generate_random_element(private_random_state, params.field);
 
     // compute sum += alpha_i * M_i
     scalar_product(&m_i, alpha[i], m_i);
     matrix_sum(&sum, sum, m_i);
   }
+
+  printf("finished computing `sum`.\n");
 
   // 2.3.2 generate a random matrix K
   Matrix K;
@@ -192,7 +204,7 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   K_size.m = params.target_rank;
   K_size.n = params.matrix_dimension.n - params.target_rank;
   allocate_matrix(&K, params.field, K_size);
-  generate_random_matrix(&K, private_random_state, params.field.log_field_size);
+  generate_random_matrix(&K, private_random_state, params.field);
 
   // 2.3.3 generate a random matrix E_R
   Matrix E_R;
@@ -200,8 +212,7 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   E_R_size.m = params.matrix_dimension.m;
   E_R_size.n = params.target_rank;
   allocate_matrix(&E_R, params.field, E_R_size);
-  generate_random_matrix(&E_R, private_random_state,
-                         params.field.log_field_size);
+  generate_random_matrix(&E_R, private_random_state, params.field);
 
   // 2.3.4 compute E from K and E_R
   Matrix E;
