@@ -1,3 +1,4 @@
+#include "constants.h"
 #include "field_arithmetics.h"
 #include "key_generation.h"
 #include "matrix.h"
@@ -94,10 +95,8 @@ uint **rotation_matrix(MatrixSize size) {
 
 void test_matrix_sum() {
   printf("------------------------------ beginning matrix sum test...\n");
-  MatrixSize size;
-  size.m = 5;
-  size.n = 5;
-  FiniteField field = gf_16();
+  MatrixSize size = {5, 5};
+  FiniteField field = GF_16;
 
   uint **identity = identity_matrix(size);
   uint **rotation = rotation_matrix(size);
@@ -134,7 +133,7 @@ void test_matrix_prod() {
   MatrixSize size;
   size.m = 5;
   size.n = 5;
-  FiniteField field = gf_16();
+  FiniteField field = GF_16;
 
   uint **rotation = rotation_matrix(size);
 
@@ -161,17 +160,22 @@ void test_random_matrix() {
   Matrix m;
   m.size.m = 4;
   m.size.n = 4;
-  FiniteField field = gf_16();
+  FiniteField field = GF_16;
   allocate_matrix(&m, field, m.size);
 
   gmp_randstate_t random_state;
   gmp_randinit_default(random_state);
+  uint lambda = 5;
+  bool *seed = allocate_seed(lambda);
+  generate_seed(seed, lambda);
+  seed_random_state(seed, lambda, random_state);
 
   generate_random_matrix(&m, random_state, field.log_field_size);
   print_matrix(&m);
 
   clear_matrix(&m);
   gmp_randclear(random_state);
+  free(seed);
 }
 
 int main(int argc, char **argv) {
@@ -195,7 +199,7 @@ int main(int argc, char **argv) {
   params.lambda = 4;
   params.matrix_dimension.m = 3;
   params.matrix_dimension.n = 3;
-  params.field = gf_16();
+  params.field = GF_16;
   params.target_rank = 1;
   params.solution_size = 4;
   params.first_challenge_size = 2;
@@ -203,4 +207,12 @@ int main(int argc, char **argv) {
   params.tau = 2;
 
   PublicPrivateKeyPair key_pair = key_gen(params);
+
+  // print addition table in GF(16)
+  printf("\n\n");
+  print_gf_16_addition_table();
+
+  // print multiplication table in GF(16)
+  printf("\n\n");
+  print_gf_16_mul_table();
 }

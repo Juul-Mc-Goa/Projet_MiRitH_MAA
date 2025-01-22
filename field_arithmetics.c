@@ -1,11 +1,17 @@
 #include "field_arithmetics.h"
+#include "constants.h"
+#include <stdio.h>
 
 typedef unsigned int uint;
 
-uint scalar_add(uint a, uint b) { return a ^ b; }
+uint scalar_add(uint a, uint b) { return GF_16_ADD_TABLE[a][b]; }
 uint scalar_neg(uint a) { return a; }
+uint scalar_mul(uint a, uint b, FiniteField field) {
+  return GF_16_MUL_TABLE[a][b];
+}
 
-uint scalar_double(uint a, FiniteField field) {
+// used for the `compute_mul` function
+uint compute_double(uint a, FiniteField field) {
   if (a & (1 << (field.log_field_size - 1))) {
     return (a << 1) ^ field.polynomial;
   } else {
@@ -13,7 +19,8 @@ uint scalar_double(uint a, FiniteField field) {
   }
 }
 
-uint scalar_mul(uint a, uint b, FiniteField field) {
+// used for the `print_gf_16_mul_table` function
+uint compute_mul(uint a, uint b, FiniteField field) {
   uint result = 0;
   uint shifted_a = a;
 
@@ -27,11 +34,20 @@ uint scalar_mul(uint a, uint b, FiniteField field) {
   return result;
 }
 
-FiniteField gf_16() {
-  FiniteField field;
-  field.field_size = 16;
-  field.log_field_size = 4;
-  field.polynomial = 19; // X^4 + X + 1
+void print_gf_16_addition_table() {
+  for (uint i = 0; i < 16; i++) {
+    for (uint j = 0; j < 16; j++) {
+      printf("%u, ", i ^ j);
+    }
+    printf("\n");
+  }
+}
 
-  return field;
+void print_gf_16_mul_table() {
+  for (uint i = 0; i < 16; i++) {
+    for (uint j = 0; j < 16; j++) {
+      printf("%u, ", scalar_mul(i, j, GF_16));
+    }
+    printf("\n");
+  }
 }

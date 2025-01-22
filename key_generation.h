@@ -29,16 +29,22 @@ typedef struct PublicKey {
   Matrix m0;
 } PublicKey;
 
+// A struct holding a `seed` in an array of `lambda` booleans.
+typedef struct PrivateKey {
+  uint lambda;
+  bool *seed;
+} PrivateKey;
+
 // A container for a public/private key pair. Returned by the `key_gen`
 // function.
 typedef struct PublicPrivateKeyPair {
-  uint lambda;
   PublicKey public_key;
-  bool *private_key;
+  PrivateKey private_key;
 } PublicPrivateKeyPair;
 
 bool *allocate_seed(uint lambda);
 void generate_seed(bool *seed, uint lambda);
+void seed_random_state(bool *seed, uint lambda, gmp_randstate_t random_state);
 
 void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
                             uint field_size);

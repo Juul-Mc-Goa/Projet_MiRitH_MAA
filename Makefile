@@ -4,8 +4,8 @@
 # @file
 # @version 0.1
 
-prog: main.o key_generation.o matrix.o field_arithmetics.o
-	gcc -o prog main.o key_generation.o field_arithmetics.o matrix.o -lgmp -lcrypto
+prog: main.o key_generation.o matrix.o field_arithmetics.o constants.o
+	gcc -o prog main.o key_generation.o field_arithmetics.o matrix.o constants.o -lgmp -lcrypto
 
 main.o: main.c
 	gcc -c -Wall main.c
@@ -18,6 +18,9 @@ field_arithmetics.o: field_arithmetics.c
 
 matrix.o: matrix.c
 	gcc -c -Wall matrix.c
+
+constants.o: constants.c
+	gcc -c -Wall constants.c
 
 clean:
 	rm -f prog *.o

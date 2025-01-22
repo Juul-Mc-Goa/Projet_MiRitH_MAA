@@ -1,3 +1,4 @@
+#include "constants.h"
 #include "key_generation.h"
 #include "field_arithmetics.h"
 #include "matrix.h"
@@ -51,10 +52,23 @@ void seed_as_string(char *result, uint lambda, bool *seed) {
   }
 }
 
+void seed_random_state(bool *seed, uint lambda, gmp_randstate_t random_state) {
+  char *seed_str = malloc(lambda * sizeof(char));
+  mpz_t gmp_seed;
+  mpz_init(gmp_seed);
+
+  // public seed
+  seed_as_string(seed_str, lambda, seed);
+  mpz_set_str(gmp_seed, seed_str, 2);
+  gmp_randseed(random_state, gmp_seed);
+
+  free(seed_str);
+}
+
 void allocate_key_pair(PublicPrivateKeyPair *key_pair,
                        SignatureParameters params) {
-  key_pair->lambda = params.lambda;
-  key_pair->private_key = malloc(params.lambda * sizeof(bool));
+  key_pair->private_key.lambda = params.lambda;
+  key_pair->private_key.seed = malloc(params.lambda * sizeof(bool));
 
   key_pair->public_key.lambda = params.lambda;
   key_pair->public_key.seed = malloc(params.lambda * sizeof(bool));
@@ -63,19 +77,19 @@ void allocate_key_pair(PublicPrivateKeyPair *key_pair,
 }
 
 void clear_key_pair(PublicPrivateKeyPair key_pair) {
-  free(key_pair.private_key);
+  free(key_pair.private_key.seed);
   free(key_pair.public_key.seed);
   clear_matrix(&key_pair.public_key.m0);
 }
 
 uint generate_random_element(gmp_randstate_t random_state,
                              uint log_field_size) {
-
   mpz_t temp;
   mpz_init(temp);
   mpz_urandomb(temp, random_state, log_field_size);
 
   uint result = mpz_get_ui(temp);
+  mpz_clear(temp);
 
   return result;
 }
@@ -92,7 +106,7 @@ void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
 SignatureParameters parameters_1_a_fast() {
   SignatureParameters result;
   result.lambda = 128;
-  result.field = gf_16();
+  result.field = GF_16;
   result.matrix_dimension.m = 15;
   result.matrix_dimension.n = 15;
   result.solution_size = 78;
@@ -107,7 +121,7 @@ SignatureParameters parameters_1_a_fast() {
 SignatureParameters parameters_1_a_short() {
   SignatureParameters result;
   result.lambda = 128;
-  result.field = gf_16();
+  result.field = GF_16;
   result.matrix_dimension.m = 15;
   result.matrix_dimension.n = 15;
   result.solution_size = 78;
@@ -123,14 +137,14 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   uint lambda = params.lambda;
   PublicPrivateKeyPair result;
   allocate_key_pair(&result, params);
-  result.lambda = lambda;
-  result.public_key.lambda = lambda;
 
   // private key generation
-  generate_seed(result.private_key, lambda);
+  result.private_key.lambda = lambda;
+  generate_seed(result.private_key.seed, lambda);
 
   // public key generation
   // 1. seed generation
+  result.public_key.lambda = lambda;
   generate_seed(result.public_key.seed, lambda);
 
   // 2. random matrix generation
@@ -142,21 +156,10 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   gmp_randinit_default(private_random_state);
 
   // 2.2. gmp random state seeding
-  char *seed_str = malloc(lambda * sizeof(char));
-  mpz_t seed;
-  mpz_init(seed);
-
   // public seed
-  seed_as_string(seed_str, lambda, result.public_key.seed);
-  mpz_set_str(seed, seed_str, 2);
-  gmp_randseed(public_random_state, seed);
-
+  seed_random_state(result.public_key.seed, lambda, public_random_state);
   // private seed
-  seed_as_string(seed_str, lambda, result.private_key);
-  mpz_set_str(seed, seed_str, 2);
-  gmp_randseed(private_random_state, seed);
-
-  free(seed_str);
+  seed_random_state(result.private_key.seed, lambda, private_random_state);
 
   // 2.3. gmp random integer generation
   // 2.3.1 generate M_1, ..., M_k, and field elements alpha_1, ..., alpha_k,
@@ -204,7 +207,7 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   Matrix E;
   allocate_matrix(&E, params.field, params.matrix_dimension);
 
-  // left side: compute E_R * K
+  // left side: compute E_L = E_R * K
   MatrixSize left_size;
   left_size.m = E.size.m;
   left_size.n = K_size.n;
