@@ -12,7 +12,7 @@ export key_gen_deps := key_generation.o matrix.o field_arithmetics.o constants.o
 
 export key_gen_flags := -lgmp
 
-prog: main.o key_gen_obj matrix.o field_arithmetics.o constants.o mpc.o
+prog: main.o key_generation.o matrix.o field_arithmetics.o constants.o mpc.o
 	gcc -o prog main.o \
 key_generation.o \
 field_arithmetics.o \

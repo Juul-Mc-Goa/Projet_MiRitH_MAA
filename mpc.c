@@ -99,11 +99,11 @@ bool mpc_check_solution(gmp_randstate_t random_state, uint number_of_parties,
                         MinRankSolution solution) {
   MatrixSize size = instance.matrix_array[0].size; // size of each matrix `M_i`
   uint n = size.n,
-       s = R.size.m,                          // intermediate matrix size
-      r = solution.target_rank,               // the rank of the solution
-      solution_size = instance.solution_size; // number of input matrices
+       s = R.size.m,            // intermediate matrix size
+      r = solution.target_rank; // the rank of the solution
 
   PartyState *parties;
+  parties = malloc(sizeof(PartyState) * number_of_parties);
   init_parties(parties, number_of_parties, s, size, r);
 
   // generate a share of `solution.alpha` and let each party use its share
@@ -181,8 +181,6 @@ void clear_party_state(PartyState *s) {
 
 void init_parties(PartyState *parties, uint number_of_parties, uint s,
                   MatrixSize size, uint target_rank) {
-  parties = malloc(sizeof(PartyState) * number_of_parties);
-
   for (uint i = 0; i < number_of_parties; i++) {
     init_party_state(&parties[i], s, size, target_rank);
   }
@@ -222,7 +220,10 @@ void compute_local_m(PartyState *state, MinRankInstance instance,
   split_each_matrix(left_part, right_part, state->M_left.size.n,
                     instance.matrix_array, instance.solution_size);
 
+  // compute the weighted sum on each part
   matrix_big_weighted_sum(&state->M_left, local_alpha.data[0], left_part,
+                          instance.solution_size);
+  matrix_big_weighted_sum(&state->M_right, local_alpha.data[0], right_part,
                           instance.solution_size);
 }
 
