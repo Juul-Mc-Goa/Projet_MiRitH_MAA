@@ -1,3 +1,5 @@
+/* Check that the sum of the sharings of `M_left, M_right` are really `M_left,
+ * M_right`. */
 #include "../constants.h"
 #include "../key_generation.h"
 #include "../matrix.h"
@@ -9,7 +11,8 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  printf("---------------------------------------------- beginning the share alpha test...");
+  printf("---------------------------------------------- beginning the share "
+         "alpha test...\n");
   uint solution_size = 4;
   uint number_of_parties = 3;
   uint target_rank = 1;
@@ -40,12 +43,13 @@ int main(int argc, char **argv) {
              M_left_size = {M_size.m, target_rank},
              M_right_size = {M_size.m, M_size.n - target_rank};
   allocate_matrix(&M, GF_16, M_size);
-  printf("allocated M\n");
 
   matrix_big_weighted_sum(&M, alpha.data[0], instance.matrix_array,
                           instance.solution_size);
 
-  // we have to allocate M_right
+  // we have to allocate `M_right.data`: it's a (as of yet not allocated) (uint
+  // **) where the data at each index `i` is a pointer to data that belongs to
+  // `M`
   M_right.data = malloc(M.size.m * sizeof(uint *));
 
   split_matrix(&M_left, &M_right, M, target_rank);
@@ -63,7 +67,7 @@ int main(int argc, char **argv) {
 
   fill_matrix_with_zero(&shared_M);
 
-  // we have to allocate shared_M_right
+  // we have to allocate `shared_M_right`
   shared_M_right.data = malloc(shared_M.size.m * sizeof(uint *));
 
   split_matrix(&shared_M_left, &shared_M_right, shared_M,
@@ -78,6 +82,10 @@ int main(int argc, char **argv) {
 
   printf("weighted sum with sharing: \n");
   print_matrix(&shared_M);
+
+  // manually free the right parts
+  free(shared_M_right.data);
+  free(M_right.data);
 
   clear_matrix(&alpha);
   clear_matrix(&M);

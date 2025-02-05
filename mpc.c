@@ -24,7 +24,6 @@ void share_alpha_and_update(Matrix alpha, gmp_randstate_t random_state,
   }
 
   // last share must be `alpha - sum`
-  // (here this is `alpha + sum` as we are in characteristic 2)
   matrix_opposite(&alpha_sum);
   matrix_sum(&local_alpha, alpha_sum, alpha);
   compute_local_m(&parties[number_of_parties - 1], instance, local_alpha,
@@ -98,7 +97,7 @@ void share_c_k_and_update(Matrix C, Matrix K, Matrix R, Matrix S,
  * multi-party computation. Arguments:
  * - `gmp_randstate_t` is needed to generate shares,
  * - `number_of_parties` specifies how many parties are to be created,
- * - `R` is a random matrix typically send by the verifier,
+ * - `R` is a random matrix typically sent by the verifier,
  * - `instance` is essentially an array of matrices,
  * - `solution` contains a vector `alpha` and a matrix `K`.
  * */
