@@ -1,5 +1,4 @@
 #include "key_generation.h"
-#include "constants.h"
 #include "field_arithmetics.h"
 #include "matrix.h"
 #include <gmp.h>
@@ -29,7 +28,7 @@ void generate_seed(bool *seed, uint lambda) {
   ssize_t result_size = getrandom(raw_seed, size, 0);
 
   if (result_size != size) {
-    printf("did not fill the required number of random booleans.\n");
+    printf("\nDid not fill the required number of random booleans.\n");
     printf("requested: %u bytes, filled: %ld bytes\n", size, result_size);
     return;
   }
@@ -93,62 +92,35 @@ uint generate_random_element(gmp_randstate_t random_state, FiniteField field) {
   return result;
 }
 
+void generate_random_vector(uint *vector, uint vector_size,
+                            gmp_randstate_t random_state, FiniteField field) {
+  for (uint i = 0; i < vector_size; i++) {
+    vector[i] = generate_random_element(random_state, field);
+  }
+}
+
 void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
                             FiniteField field) {
   for (uint i = 0; i < m->size.m; i++) {
     for (uint j = 0; j < m->size.n; j++) {
-      m->data[i][j] =
-          generate_random_element(random_state, field);
+      m->data[i][j] = generate_random_element(random_state, field);
     }
   }
-}
-
-SignatureParameters parameters_1_a_fast() {
-  SignatureParameters result;
-  result.lambda = 128;
-  result.field = GF_16;
-  result.matrix_dimension.m = 15;
-  result.matrix_dimension.n = 15;
-  result.solution_size = 78;
-  result.target_rank = 6;
-  result.first_challenge_size = 5;
-  result.number_of_parties = 16;
-  result.tau = 39;
-
-  return result;
-}
-
-SignatureParameters parameters_1_a_short() {
-  SignatureParameters result;
-  result.lambda = 128;
-  result.field = GF_16;
-  result.matrix_dimension.m = 15;
-  result.matrix_dimension.n = 15;
-  result.solution_size = 78;
-  result.target_rank = 6;
-  result.first_challenge_size = 9;
-  result.number_of_parties = 256;
-  result.tau = 19;
-
-  return result;
 }
 
 PublicPrivateKeyPair key_gen(SignatureParameters params) {
   uint lambda = params.lambda;
   PublicPrivateKeyPair result;
   allocate_key_pair(&result, params);
-  printf("key allocated.\n");
 
   // private key generation
   result.private_key.lambda = lambda;
   generate_seed(result.private_key.seed, lambda);
-  printf("private seed generated.\n");
 
   // public key generation
   // 1. seed generation
   result.public_key.lambda = lambda;
   generate_seed(result.public_key.seed, lambda);
-  printf("public seed generated.\n");
 
   // 2. random matrix generation
   // 2.1. gmp random state initialization
@@ -158,15 +130,11 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   gmp_randstate_t private_random_state;
   gmp_randinit_default(private_random_state);
 
-  printf("random states initialized.\n");
-
   // 2.2. gmp random state seeding
   // public seed
   seed_random_state(result.public_key.seed, lambda, public_random_state);
   // private seed
   seed_random_state(result.private_key.seed, lambda, private_random_state);
-
-  printf("random states seeded.\n");
 
   // 2.3. gmp random integer generation
   // 2.3.1 generate M_1, ..., M_k, and field elements alpha_1, ..., alpha_k,
@@ -174,13 +142,9 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   uint *alpha = malloc(params.solution_size * sizeof(uint));
   alpha[0] = 1;
 
-  printf("allocated alpha.\n");
-
   Matrix sum;
   allocate_matrix(&sum, params.field, params.matrix_dimension);
   fill_matrix_with_zero(&sum);
-
-  printf("initialized `sum`.\n");
 
   Matrix m_i;
   allocate_matrix(&m_i, params.field, params.matrix_dimension);
@@ -195,8 +159,6 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
     scalar_product(&m_i, alpha[i], m_i);
     matrix_sum(&sum, sum, m_i);
   }
-
-  printf("finished computing `sum`.\n");
 
   // 2.3.2 generate a random matrix K
   Matrix K;
@@ -238,7 +200,7 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
 
   // 2.3.5 compute M_0 = E - sum: here field_size is a power of two, so -1 = 1,
   // and M_0 = E + sum
-  allocate_matrix(&result.public_key.m0, params.field, params.matrix_dimension);
+  matrix_opposite(&sum);
   matrix_sum(&result.public_key.m0, E, sum);
 
   clear_matrix(&sum);

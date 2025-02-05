@@ -4,6 +4,7 @@
 %%% End:
 
 \documentclass{article}
+\usepackage[french]{babel}
 
 \title{Projet MiRitH}
 \author{Maxime Coute \and Jules Magois}
@@ -15,10 +16,35 @@
 \subsection{Problème MinRank}
 \subsection{Authentification zero-knowledge utilisant MPC-in-the-head}
 \subsection{Fiat-Shamir pour obtenir une signature}
+\subsection{Sécurité}
+
+Soient:
+\begin{enumerate}
+  \item \(N\) le nombre total de parties,
+  \item \(\tau\) le nombre de tours effectués.
+\end{enumerate}
+
+La probabilité qu'un faux signataire arrive à une signature correcte est
+proportionnelle à \(N^{-\tau}\).
+
+La taille d'une signature (en nombre de bits) est proportionnelle à  \(\tau\).
+
+On peut donc faire différents choix de \(N\) et \(\tau\) en fonction de nos besoins:
+\begin{itemize}
+  \item \(N\) petit et \(\tau\) élevé pour générer rapidement une signature de grande taille,
+  \item \(N\) grand et \(\tau\) faible pour générer une signature courte.
 
 \section{Proposition de structure du code}
 
 \begin{enumerate}
+  \item un fichier \verb!field_arithmetics.c! pour l'addition et la multiplication
+        sur \(GF(16)\),
+  \item un fichier \verb!constants.c! contenant les constantes utiles pour tous les autres fichiers:
+        \begin{itemize}
+          \item la définition du corps \verb!GF_16!
+          \item quelques paramètres de signature standards
+          \item les tables d'addition et de multiplication dans \verb!GF_16!
+       \end{itemize}
   \item un fichier \verb!matrix.c! pour gérer les opérations sur les matrices:
         \begin{itemize}
           \item allocation de mémoire
@@ -33,8 +59,8 @@
 
 \section{Bibliothèques utilisées}
 \begin{enumerate}
-  \item \verb!gmp! pour la génération de nombres aléatoires, et les calculs sur les grands entiers,
-    \item \verb!openssl! pour l'utilisation du hash \emph{Keccak}.
+  \item \verb!gmp! pour la génération de nombres aléatoires,
+  \item \verb!openssl! pour l'utilisation du hash \emph{Keccak}.
 \end{enumerate}
 
 \end{document}

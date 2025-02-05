@@ -1,4 +1,5 @@
 #include "matrix.h"
+#include "constants.h"
 #include "field_arithmetics.h"
 #include <gmp.h>
 #include <stdio.h>
@@ -52,12 +53,29 @@ void fill_matrix_with_zero(Matrix *m) {
   }
 }
 
+bool matrix_is_zero(Matrix m) {
+  for (uint i = 0; i < m.size.m; i++) {
+    for (uint j = 0; j < m.size.n; j++) {
+      if (m.data[i][j] != 0) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 void print_matrix(Matrix *m) {
   for (uint i = 0; i < m->size.m; i++) {
     for (uint j = 0; j < m->size.n; j++) {
       printf("%u ", m->data[i][j]);
     }
     printf("\n");
+  }
+}
+
+void vector_sum(uint *result, uint length, uint *left, uint *right) {
+  for (uint i = 0; i < length; i++) {
+    result[i] = scalar_add(left[i], right[i]);
   }
 }
 
@@ -87,6 +105,25 @@ void matrix_big_sum(Matrix *result, Matrix *summands, uint k) {
   }
 }
 
+void matrix_big_weighted_sum(Matrix *result, uint *weights, Matrix *summands,
+                             uint k) {
+  fill_matrix_with_zero(result);
+
+  Matrix temp;
+  allocate_matrix(&temp, GF_16, result->size);
+
+  for (uint i = 0; i < k; i++) {
+    scalar_product(&temp, weights[i], summands[i]);
+    matrix_sum(result, *result, temp);
+  }
+}
+
+void vector_opposite(uint *vec, uint length) {
+  for (uint i = 0; i < length; i++) {
+    vec[i] = scalar_neg(vec[i]);
+  }
+}
+
 void matrix_opposite(Matrix *m) {
   for (uint i = 0; i < m->size.m; i++) {
     for (uint j = 0; j < m->size.n; j++) {
@@ -100,7 +137,7 @@ void matrix_opposite(Matrix *m) {
 void scalar_product(Matrix *result, uint scalar, Matrix m) {
   for (uint i = 0; i < m.size.m; i++) {
     for (uint j = 0; j < m.size.n; j++) {
-      result->data[i][j] = scalar_mul(scalar, m.data[i][j], m.field);
+      result->data[i][j] = scalar_mul(scalar, m.data[i][j]);
     }
   }
 }
@@ -119,8 +156,7 @@ void matrix_product(Matrix *result, Matrix m_left, Matrix m_right) {
       result->data[i][j] = 0;
       for (uint l = 0; l < mid_dimension; l++) {
         // compute `result[i][j] += m_left[i][l] * m_right[l][j]`
-        result->data[i][j] ^=
-            scalar_mul(m_left.data[i][l], m_right.data[l][j], m_left.field);
+        result->data[i][j] ^= scalar_mul(m_left.data[i][l], m_right.data[l][j]);
       }
     }
   }

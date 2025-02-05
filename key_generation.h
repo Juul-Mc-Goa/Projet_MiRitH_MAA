@@ -46,7 +46,10 @@ bool *allocate_seed(uint lambda);
 void generate_seed(bool *seed, uint lambda);
 void seed_random_state(bool *seed, uint lambda, gmp_randstate_t random_state);
 
-void generate_random_matrix(Matrix *m, gmp_randstate_t random_state, FiniteField field);
+void generate_random_vector(uint *vector, uint vector_size,
+                            gmp_randstate_t random_state, FiniteField field);
+void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
+                            FiniteField field);
 
 void allocate_key_pair(PublicPrivateKeyPair *key_pair,
                        SignatureParameters parameters);

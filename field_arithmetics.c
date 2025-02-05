@@ -32,20 +32,24 @@ uint compute_mul(uint a, uint b) {
   return result;
 }
 
+// Generate addition table in GF(16). The output is then used in the
+// `GF_16_ADD_TABLE` constant.
 void print_gf_16_addition_table() {
   for (uint i = 0; i < 16; i++) {
     printf("{");
-    for (uint j = 0; j < 16; j++) {
+    for (uint j = 0; j < 15; j++) {
       printf("%u, ", i ^ j);
     }
     printf("%u},\n", i ^ 15);
   }
 }
 
+// Generate multiplication table in GF(16). The output is then used in the
+// `GF_16_MUL_TABLE` constant.
 void print_gf_16_mul_table() {
   for (uint i = 0; i < 16; i++) {
     printf("{");
-    for (uint j = 0; j < 16; j++) {
+    for (uint j = 0; j < 15; j++) {
       printf("%u, ", compute_mul(i, j));
     }
     printf("%u},\n", compute_mul(i, 15));
