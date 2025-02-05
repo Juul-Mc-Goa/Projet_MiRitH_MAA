@@ -53,6 +53,9 @@ void share_a_and_update(Matrix A, Matrix R, gmp_randstate_t random_state,
   matrix_opposite(&A_sum);
   matrix_sum(&local_A, A, A_sum);
   compute_local_s(&parties[number_of_parties - 1], R, local_A);
+
+  clear_matrix(&A_sum);
+  clear_matrix(&local_A);
 }
 
 /* Share the two matrices `C, K` into `number_of_parties` parts, then use them
@@ -84,6 +87,11 @@ void share_c_k_and_update(Matrix C, Matrix K, Matrix R, Matrix S,
   matrix_sum(&local_C, C, C_sum);
   matrix_sum(&local_K, K, K_sum);
   compute_local_v(&parties[number_of_parties - 1], S, local_K, R, local_C);
+
+  clear_matrix(&C_sum);
+  clear_matrix(&K_sum);
+  clear_matrix(&local_C);
+  clear_matrix(&local_K);
 }
 
 /* Check that the given `solution` to the MinRank `instance` is correct, with
@@ -152,19 +160,10 @@ bool mpc_check_solution(gmp_randstate_t random_state, uint number_of_parties,
 
 void init_party_state(PartyState *state, uint s, MatrixSize size,
                       uint target_rank) {
-  MatrixSize size_left, size_right, size_S, size_V;
 
-  size_left.m = size.m;
-  size_left.n = size.n - target_rank;
-
-  size_right.m = size.m;
-  size_right.n = target_rank;
-
-  size_S.m = s;
-  size_S.n = target_rank;
-
-  size_V.m = s;
-  size_V.n = size.n - target_rank;
+  MatrixSize size_left = {size.m, size.n - target_rank},
+             size_right = {size.m, target_rank}, size_S = {s, target_rank},
+             size_V = {s, size.n - target_rank};
 
   allocate_matrix(&state->M_left, GF_16, size_left);
   allocate_matrix(&state->M_right, GF_16, size_right);
@@ -194,20 +193,21 @@ void clear_parties(PartyState *parties, uint size) {
   free(parties);
 }
 
-void split_each_matrix(Matrix *result_left, Matrix *result_right, uint mid,
-                       Matrix *input, uint length) {
-  for (uint i = 0; i < length; i++) {
-    result_left[i].size.m = input[i].size.m;
-    result_left[i].size.n = mid;
-    result_left[i].data = input[i].data;
+void init_instance(MinRankInstance *instance, uint solution_size,
+                   MatrixSize input_matrix_size) {
+  instance->solution_size = solution_size;
+  instance->matrix_array = malloc(sizeof(Matrix) * solution_size);
 
-    result_right[i].size.m = input[i].size.m;
-    result_right[i].size.n = input[i].size.n - mid;
-    // store the pointer to element of index `mid`
-    for (uint j = 0; j < input[i].size.m; j++) {
-      result_right[i].data[j] = input[i].data[j] + mid;
-    }
+  for (uint i = 0; i < solution_size; i++) {
+    allocate_matrix(&instance->matrix_array[i], GF_16, input_matrix_size);
   }
+}
+
+void clear_instance(MinRankInstance *instance) {
+  for (uint i = 0; i < instance->solution_size; i++) {
+    clear_matrix(&instance->matrix_array[i]);
+  }
+  free(instance->matrix_array);
 }
 
 /* compute the weighted sum of `instance.matrix_array` with `local_alpha`. */
@@ -217,8 +217,13 @@ void compute_local_m(PartyState *state, MinRankInstance instance,
   Matrix *left_part = malloc(sizeof(Matrix) * solution_size),
          *right_part = malloc(sizeof(Matrix) * solution_size);
 
-  split_each_matrix(left_part, right_part, state->M_left.size.n,
-                    instance.matrix_array, instance.solution_size);
+  // we have to allocate each uint** in the right part
+  for (uint i = 0; i < solution_size; i++) {
+    right_part[i].data = malloc(state->M_right.size.m * sizeof(uint *));
+  }
+
+  split_each_matrix(left_part, right_part, instance.matrix_array,
+                    state->M_left.size.n, instance.solution_size);
 
   // compute the weighted sum on each part
   matrix_big_weighted_sum(&state->M_left, local_alpha.data[0], left_part,

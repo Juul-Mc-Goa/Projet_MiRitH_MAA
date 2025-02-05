@@ -22,6 +22,9 @@ void allocate_matrix(Matrix *result, FiniteField field, MatrixSize size);
 void copy_into_matrix(Matrix *m, uint **array);
 void matrix_init_set(Matrix *m, Matrix src_matrix);
 void fill_matrix_with_zero(Matrix *m);
+void split_matrix(Matrix *left, Matrix *right, Matrix input, uint mid);
+void split_each_matrix(Matrix *left, Matrix *right, Matrix *input, uint mid,
+                       uint length);
 bool matrix_is_zero(Matrix m);
 void print_matrix(Matrix *m);
 void clear_matrix(Matrix *m);

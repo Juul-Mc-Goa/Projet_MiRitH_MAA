@@ -162,17 +162,14 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
 
   // 2.3.2 generate a random matrix K
   Matrix K;
-  MatrixSize K_size;
-  K_size.m = params.target_rank;
-  K_size.n = params.matrix_dimension.n - params.target_rank;
+  MatrixSize K_size = {params.target_rank,
+                       params.matrix_dimension.n - params.target_rank};
   allocate_matrix(&K, params.field, K_size);
   generate_random_matrix(&K, private_random_state, params.field);
 
   // 2.3.3 generate a random matrix E_R
   Matrix E_R;
-  MatrixSize E_R_size;
-  E_R_size.m = params.matrix_dimension.m;
-  E_R_size.n = params.target_rank;
+  MatrixSize E_R_size = {params.matrix_dimension.m, params.target_rank};
   allocate_matrix(&E_R, params.field, E_R_size);
   generate_random_matrix(&E_R, private_random_state, params.field);
 
@@ -181,11 +178,10 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   allocate_matrix(&E, params.field, params.matrix_dimension);
 
   // left side: compute E_L = E_R * K
-  MatrixSize left_size;
-  left_size.m = E.size.m;
-  left_size.n = K_size.n;
-
+  // E_L is just a view of E so it does not need to be allocated or freed
   Matrix E_L;
+  MatrixSize left_size = {E.size.m, K_size.n};
+
   E_L.field = params.field;
   E_L.size = left_size;
   E_L.data = E.data;

@@ -5,12 +5,14 @@
 # @version 0.1
 
 test_dir := tests
-all_tests := $(wildcard ${test_dir}/*.c)
+all_tests := $(wildcard $(test_dir)/*.c)
 
 export matrix_deps := matrix.o field_arithmetics.o constants.o
 export key_gen_deps := key_generation.o matrix.o field_arithmetics.o constants.o
+export mpc_deps := mpc.o key_generation.o matrix.o field_arithmetics.o constants.o
 
 export key_gen_flags := -lgmp
+export mpc_flags := -lgmp
 
 prog: main.o key_generation.o matrix.o field_arithmetics.o constants.o mpc.o
 	gcc -o prog main.o \
@@ -40,7 +42,7 @@ constants.o: constants.c
 	gcc -c -Wall constants.c
 
 test:
-	cd ${test_dir} && $(MAKE)
+	cd $(test_dir) && $(MAKE)
 
 clean:
 	rm -f prog *.o
