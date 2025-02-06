@@ -54,24 +54,24 @@ void fill_matrix_with_zero(Matrix *m) {
 }
 
 /* Split `input` into a left part and a right part. */
-void split_matrix(Matrix *left, Matrix *right, Matrix input, uint mid) {
+void split_matrix(Matrix *left, Matrix *right, Matrix input, uint target_rank) {
   left->size.m = input.size.m;
-  left->size.n = mid;
+  left->size.n = input.size.n - target_rank;
   left->data = input.data;
 
   right->size.m = input.size.m;
-  right->size.n = input.size.n - mid;
+  right->size.n = target_rank;
   // store the pointer to element of index `mid`
   for (uint i = 0; i < input.size.m; i++) {
-    right->data[i] = &input.data[i][mid];
+    right->data[i] = &input.data[i][left->size.n];
   }
 }
 
 /* Split each matrix in `input`. */
-void split_each_matrix(Matrix *left, Matrix *right, Matrix *input, uint mid,
-                       uint length) {
+void split_each_matrix(Matrix *left, Matrix *right, Matrix *input,
+                       uint target_rank, uint length) {
   for (uint i = 0; i < length; i++) {
-    split_matrix(&left[i], &right[i], input[i], mid);
+    split_matrix(&left[i], &right[i], input[i], target_rank);
   }
 }
 

@@ -1,7 +1,8 @@
-#include "constants.h"
 #include "field_arithmetics.h"
 #include "key_generation.h"
 #include "matrix.h"
+#include "random.h"
+
 #include <gmp.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -64,23 +65,6 @@ err:
   return ret;
 }
 
-void test_key_gen() {
-  printf("------------------------------ beginning key generation test...\n");
-  SignatureParameters params;
-  params.lambda = 4;
-  params.matrix_dimension.m = 3;
-  params.matrix_dimension.n = 3;
-  params.field = GF_16;
-  params.target_rank = 1;
-  params.solution_size = 4;
-  params.first_challenge_size = 2;
-  params.number_of_parties = 2;
-  params.tau = 2;
-
-  PublicPrivateKeyPair key_pair = key_gen(params);
-  printf("finished key generation.\n");
-}
-
 int main(int argc, char **argv) {
   // seed generation
   uint lambda = 4;
@@ -91,9 +75,6 @@ int main(int argc, char **argv) {
   for (uint i = 0; i < 4; i++) {
     printf("%u: %u\n", i, seed[i]);
   }
-
-  // key generation
-  test_key_gen();
 
   // print addition table in GF(16)
   printf("\n\nAddition Table for GF(16):\n");

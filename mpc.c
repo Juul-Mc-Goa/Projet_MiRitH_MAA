@@ -2,6 +2,8 @@
 #include "constants.h"
 #include "key_generation.h"
 #include "matrix.h"
+#include "random.h"
+
 #include <stdbool.h>
 #include <stdlib.h>
 
@@ -49,8 +51,10 @@ void share_a_and_update(Matrix A, Matrix R, gmp_randstate_t random_state,
     compute_local_s(&parties[i], R, local_A);
   }
 
+  // last party has share `A - A_sum`
   matrix_opposite(&A_sum);
   matrix_sum(&local_A, A, A_sum);
+
   compute_local_s(&parties[number_of_parties - 1], R, local_A);
 
   clear_matrix(&A_sum);
@@ -222,7 +226,7 @@ void compute_local_m(PartyState *state, MinRankInstance instance,
   }
 
   split_each_matrix(left_part, right_part, instance.matrix_array,
-                    state->M_left.size.n, instance.solution_size);
+                    state->M_right.size.n, instance.solution_size);
 
   // compute the weighted sum on each part
   matrix_big_weighted_sum(&state->M_left, local_alpha.data[0], left_part,
@@ -231,6 +235,7 @@ void compute_local_m(PartyState *state, MinRankInstance instance,
                           instance.solution_size);
 }
 
+/* Compute `S = R * M_right + A` */
 void compute_local_s(PartyState *state, Matrix R, Matrix local_A) {
   matrix_product(&state->S, R, state->M_right);
   matrix_sum(&state->S, state->S, local_A);

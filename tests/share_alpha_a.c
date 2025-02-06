@@ -1,5 +1,4 @@
-/* Check that the sums of the additive sharings of `M_left, M_right` really are
- * `M_left, M_right`. */
+/* Check that the sum of the additive sharing of `S` really is * `S`. */
 #include "../constants.h"
 #include "../key_generation.h"
 #include "../matrix.h"
@@ -13,7 +12,7 @@
 
 int main(int argc, char **argv) {
   printf("---------------------------------------------- beginning the share "
-         "alpha test...\n");
+         "alpha/A test...\n");
   uint solution_size = 4;
   uint number_of_parties = 3;
   uint target_rank = 1;
@@ -79,13 +78,46 @@ int main(int argc, char **argv) {
   printf("weighted sum with sharing: \n");
   print_matrix(&shared_M);
 
+  // generate two random matrices `A, R`
+  Matrix A, R;
+  MatrixSize A_size = {s, target_rank}, R_size = {s, input_matrix_size.m};
+  allocate_matrix(&A, GF_16, A_size);
+  allocate_matrix(&R, GF_16, R_size);
+  generate_random_matrix(&A, random_state, GF_16);
+  generate_random_matrix(&R, random_state, GF_16);
+
+  printf("random matrix R:\n");
+  print_matrix(&R);
+  printf("random matrix A:\n");
+  print_matrix(&A);
+
+  // compute `S = R * M_right + A`
+  Matrix S;
+  allocate_matrix(&S, GF_16, A_size);
+  matrix_product(&S, R, M_right);
+  matrix_sum(&S, S, A);
+
+  // generate a share of `A`, and use it to compute `S`
+  share_a_and_update(A, R, random_state, number_of_parties, parties);
+
+  // compute the sum of `parties[i].S`
+  Matrix shared_S;
+  allocate_matrix(&shared_S, GF_16, A_size);
+  compute_global_s(&shared_S, parties, number_of_parties);
+
+  printf("R*M_right + A (not shared):\n");
+  print_matrix(&S);
+  printf("R*M_right + A (shared):\n");
+  print_matrix(&shared_S);
+
   // manually free the right parts
   free(shared_M_right.data);
   free(M_right.data);
 
   clear_matrix(&alpha);
   clear_matrix(&M);
-  clear_matrix(&shared_M);
+  clear_matrix(&S);
+  clear_matrix(&shared_S);
   clear_parties(parties, number_of_parties);
   clear_instance(&instance);
   gmp_randclear(random_state);
