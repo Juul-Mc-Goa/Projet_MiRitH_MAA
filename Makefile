@@ -9,13 +9,12 @@
 test_dir := tests
 all_tests := $(wildcard $(test_dir)/*.c)
 
-# define dependencies for various files, useful when testing
+# define dependencies for various files, used in `tests/Makefile`
 field_deps := field_arithmetics.o constants.o
 export matrix_deps := matrix.o field_arithmetics.o constants.o
 random_matrix_deps := random.o $(matrix_deps)
 export key_gen_deps := key_generation.o $(random_matrix_deps)
 export mpc_deps := mpc.o $(random_matrix_deps)
-export all_deps := mpc.o key_generation.o $(random_matrix_deps)
 
 export key_gen_flags := -lgmp
 export mpc_flags := -lgmp
@@ -36,6 +35,6 @@ test:
 	cd $(test_dir) && $(MAKE)
 
 clean:
-	rm -f prog $(objects)
+	rm -f prog $(objects) && cd $(test_dir) && $(MAKE) clean
 
 # end
