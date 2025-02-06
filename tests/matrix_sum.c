@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  printf("------------------------------ beginning matrix sum test...\n");
+  printf("--------------------------------------------------- beginning matrix sum test...\n");
   MatrixSize size = {5, 5};
   FiniteField field = GF_16;
 

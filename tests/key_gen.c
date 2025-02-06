@@ -12,7 +12,7 @@ void print_seed(bool *seed, uint lambda) {
 }
 
 int main(int argc, char **argv) {
-  printf("------------------------------ beginning key generation test...\n");
+  printf("----------------------------------------------- beginning key generation test...\n");
   SignatureParameters params;
   params.lambda = 4;
   params.matrix_dimension.m = 3;

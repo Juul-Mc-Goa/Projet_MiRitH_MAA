@@ -73,10 +73,10 @@ int main(int argc, char **argv) {
     matrix_sum(&shared_M_right, parties[i].M_right, shared_M_right);
   }
 
-  printf("weighted sum without sharing: \n");
+  printf("M (not shared): \n");
   print_matrix(&M);
 
-  printf("weighted sum with sharing: \n");
+  printf("M (shared): \n");
   print_matrix(&shared_M);
 
   // manually free the right parts

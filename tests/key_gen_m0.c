@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  printf("--------------------------- beginning key generation m0 test...\n");
+  printf("-------------------------------------------- beginning key generation m0 test...\n");
   SignatureParameters params;
   params.lambda = 4;
   params.matrix_dimension.m = 3;

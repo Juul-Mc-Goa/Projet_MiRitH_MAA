@@ -1,6 +1,7 @@
 #include "../constants.h"
 #include "../key_generation.h"
 #include "../matrix.h"
+#include "../random.h"
 
 #include <gmp.h>
 #include <stdbool.h>
@@ -8,7 +9,8 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  printf("------------------------------ beginning random matrix test...\n");
+  printf("------------------------------------------------ beginning random "
+         "matrix test...\n");
   Matrix m;
   m.size.m = 4;
   m.size.n = 4;

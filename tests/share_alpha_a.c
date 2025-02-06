@@ -11,8 +11,8 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  printf("---------------------------------------------- beginning the share "
-         "alpha/A test...\n");
+  printf("-------------------------------------------- beginning the share"
+         " alpha/A test...\n");
   uint solution_size = 4;
   uint number_of_parties = 3;
   uint target_rank = 1;
@@ -65,8 +65,7 @@ int main(int argc, char **argv) {
   // we have to allocate `shared_M_right`
   shared_M_right.data = malloc(shared_M.size.m * sizeof(uint *));
 
-  split_matrix(&shared_M_left, &shared_M_right, shared_M,
-               target_rank);
+  split_matrix(&shared_M_left, &shared_M_right, shared_M, target_rank);
   for (uint i = 0; i < number_of_parties; i++) {
     matrix_sum(&shared_M_left, parties[i].M_left, shared_M_left);
     matrix_sum(&shared_M_right, parties[i].M_right, shared_M_right);

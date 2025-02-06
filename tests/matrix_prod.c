@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  printf("------------------------------ beginning matrix product test...\n");
+  printf("----------------------------------------------- beginning matrix product test...\n");
   MatrixSize size;
   size.m = 5;
   size.n = 5;

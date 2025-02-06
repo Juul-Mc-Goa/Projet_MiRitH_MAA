@@ -1,6 +1,5 @@
 #include "mpc.h"
 #include "constants.h"
-#include "key_generation.h"
 #include "matrix.h"
 #include "random.h"
 
