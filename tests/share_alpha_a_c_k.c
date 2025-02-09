@@ -1,4 +1,4 @@
-/* Check that the sum of the additive sharing of `S` really is * `S`. */
+/* Check that the sum of the additive sharing of `V` really is * `V`. */
 #include "../constants.h"
 #include "../key_generation.h"
 #include "../matrix.h"
@@ -12,8 +12,8 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  printf("-------------------------------------------- beginning the share"
-         " alpha/A test...\n");
+  printf("---------------------------------------- beginning the share "
+         "alpha/A/C/K test...\n");
   uint solution_size = 4;
   uint matrix_count = solution_size + 1;
   uint number_of_parties = 3;
@@ -38,9 +38,8 @@ int main(int argc, char **argv) {
   // compute M using the global `alpha`, and split the result into `M_left,
   // M_right`. Check that it is indeed equal to the sum of each party's `M`.
   Matrix M, shared_M;
-  MatrixSize M_size = {input_matrix_size.m, input_matrix_size.n};
-  allocate_matrix(&M, GF_16, M_size);
-  allocate_matrix(&shared_M, GF_16, M_size);
+  allocate_matrix(&M, GF_16, input_matrix_size);
+  allocate_matrix(&shared_M, GF_16, input_matrix_size);
 
   PartyState *parties = malloc(sizeof(PartyState) * number_of_parties);
 
@@ -61,13 +60,56 @@ int main(int argc, char **argv) {
   generate_A_R_and_sum_S(A, R, S, M_right, parties, number_of_parties,
                          random_state);
 
+  // generate K, C and sum V
+  Matrix K, C, V;
+  MatrixSize C_size = {s, input_matrix_size.n - target_rank};
+  allocate_matrix(&K, GF_16, C_size);
+  allocate_matrix(&C, GF_16, C_size);
+  allocate_matrix(&V, GF_16, C_size);
+
+  generate_random_matrix(&K, random_state, GF_16);
+  matrix_product(&C, A, K);
+
+  // generate a share of `C` and `K`, and use them to compute `V`
+  share_c_k_and_update(C, K, R, S, random_state, number_of_parties, parties);
+
+  // compute S*K
+  matrix_product(&V, S, K);
+
+  // compute R*M_left
+  Matrix temp;
+  allocate_matrix(&temp, GF_16, V.size);
+  matrix_product(&temp, R, M_left);
+
+  // V -= R*M_left
+  matrix_opposite(&temp);
+  matrix_sum(&V, V, temp);
+
+  // V -= C
+  matrix_opposite(&C);
+  matrix_sum(&V, V, C);
+
+  Matrix shared_V;
+  allocate_matrix(&shared_V, GF_16, C_size);
+  compute_global_v(&shared_V, parties, number_of_parties);
+
+  printf("\nV (not shared):\n");
+  print_matrix(&V);
+  printf("\nV (shared):\n");
+  print_matrix(&shared_V);
+
   // manually free the right part
   free(M_right.data);
 
   clear_matrix(&alpha);
+  clear_matrix(&A);
+  clear_matrix(&C);
   clear_matrix(&M);
   clear_matrix(&S);
   clear_matrix(&shared_M);
+  clear_matrix(&shared_V);
+  clear_matrix(&temp);
+  clear_matrix(&V);
   clear_parties(parties, number_of_parties);
   clear_instance(&instance);
   gmp_randclear(random_state);

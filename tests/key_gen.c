@@ -32,7 +32,9 @@ int main(int argc, char **argv) {
          params.target_rank, params.solution_size, params.first_challenge_size,
          params.number_of_parties, params.tau);
 
-  PublicPrivateKeyPair key_pair = key_gen(params);
+  PublicPrivateKeyPair key_pair;
+  allocate_key_pair(&key_pair, params);
+  key_gen(&key_pair, params);
 
   printf("public key:\n");
   printf("- lambda: %u\n", key_pair.public_key.lambda);

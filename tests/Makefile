@@ -10,16 +10,21 @@
 local_matrix_deps := $(matrix_deps:%.o=../%.o) matrix_common.o
 local_key_gen_deps := $(key_gen_deps:%.o=../%.o)
 local_mpc_deps := $(mpc_deps:%.o=../%.o) mpc_common.o
+local_all_deps := $(all_deps:%.o=../%.o) mpc_common.o
 
 # Linked binaries
 bin_with_matrix := matrix_sum matrix_prod
-bin_with_key_gen := random_matrix key_gen
+bin_with_key_gen := random_matrix key_gen key_gen_m0
 bin_with_mpc := share_alpha share_alpha_a share_alpha_a_c_k
-bins := $(bin_with_matrix) $(bin_with_key_gen) $(bin_with_mpc)
+bin_with_all := key_gen_and_mpc matrix_distrib matrix_assoc
+bins := $(bin_with_matrix) $(bin_with_key_gen) $(bin_with_mpc) $(bin_with_all)
 
 # Run all tests
 all: $(bins)
 	$(foreach bin,$(bins),./$(bin) && ) echo "All tests done."
+
+$(bin_with_all): %: %.o $(local_all_deps)
+	gcc -o $@ $^ $$all_flags
 
 $(bin_with_mpc): %: %.o $(local_mpc_deps)
 	gcc -o $@ $^ $$mpc_flags

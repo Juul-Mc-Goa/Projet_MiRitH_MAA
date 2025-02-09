@@ -16,10 +16,8 @@ int main(int argc, char **argv) {
   printf("---------------------------------------------- beginning the share "
          "alpha test...\n");
 
-  uint solution_size = 4;
-  uint number_of_parties = 3;
-  uint target_rank = 1;
-  uint s = 2;
+  uint number_of_parties = 3, target_rank = 1, s = 2, solution_size = 4;
+  uint matrix_count = solution_size + 1;
 
   gmp_randstate_t random_state;
   gmp_randinit_default(random_state);
@@ -27,12 +25,12 @@ int main(int argc, char **argv) {
   // generate a random instance
   MinRankInstance instance;
   MatrixSize input_matrix_size = {3, 3};
-  init_instance(&instance, solution_size, input_matrix_size);
-  generate_random_instance(&instance, solution_size, random_state, GF_16);
+  init_instance(&instance, matrix_count, input_matrix_size);
+  generate_random_instance(&instance, matrix_count, random_state, GF_16);
 
   // generate a random vector `alpha`
   Matrix alpha;
-  MatrixSize alpha_size = {1, solution_size};
+  MatrixSize alpha_size = {1, matrix_count};
   allocate_matrix(&alpha, GF_16, alpha_size);
   generate_random_matrix(&alpha, random_state, GF_16);
 

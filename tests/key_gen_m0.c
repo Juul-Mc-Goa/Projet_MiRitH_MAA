@@ -3,13 +3,15 @@
 #include "../constants.h"
 #include "../key_generation.h"
 #include "../matrix.h"
+#include "../random.h"
 
 #include <gmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
-  printf("-------------------------------------------- beginning key generation m0 test...\n");
+  printf("--------------------------------------------------- beginning key "
+         "gen m0 test...\n");
   SignatureParameters params;
   params.lambda = 4;
   params.matrix_dimension.m = 3;
@@ -22,7 +24,9 @@ int main(int argc, char **argv) {
   params.tau = 2;
 
   // call `key_gen`
-  PublicPrivateKeyPair key_pair = key_gen(params);
+  PublicPrivateKeyPair key_pair;
+  allocate_key_pair(&key_pair, params);
+  key_gen(&key_pair, params);
   printf("finished key_gen.\n");
 
   // perform the same computations
@@ -65,33 +69,21 @@ int main(int argc, char **argv) {
   allocate_matrix(&K, params.field, K_size);
   generate_random_matrix(&K, private_random_state, params.field);
 
+  // 2.3.3 compute E from K and E_R
+  Matrix E, E_L, E_R;
+  allocate_matrix(&E, params.field, params.matrix_dimension);
+  fill_matrix_with_zero(&E);
+
+  E_R.data = malloc(params.matrix_dimension.m * sizeof(uint *));
+  split_matrix(&E_L, &E_R, E, params.target_rank);
+
   // generate a random matrix E_R
-  Matrix E_R;
-  MatrixSize E_R_size = {params.matrix_dimension.m, params.target_rank};
-  allocate_matrix(&E_R, params.field, E_R_size);
   generate_random_matrix(&E_R, private_random_state, params.field);
 
-  // compute E from K and E_R
-  Matrix E;
-  allocate_matrix(&E, params.field, params.matrix_dimension);
-
-  // left side: compute E_L = E_R * K
-  MatrixSize left_size = {E.size.m, K_size.n};
-
-  Matrix E_L;
-  E_L.field = params.field;
-  E_L.size = left_size;
-  E_L.data = E.data;
+  // compute E_L = E_R * K
   matrix_product(&E_L, E_R, K);
 
-  // right side: copy E_R into E
-  for (uint i = 0; i < E.size.m; i++) {
-    for (uint j = K_size.n; j < E.size.n; j++) {
-      E.data[i][j] = E_R.data[i][j - K_size.n];
-    }
-  }
-
-  // 2.3.5 compute M_0 = E - sum
+  // 2.3.4 compute M_0 = E - sum
   Matrix m0;
   allocate_matrix(&m0, GF_16, key_pair.public_key.m0.size);
 
@@ -106,10 +98,10 @@ int main(int argc, char **argv) {
   print_matrix(&m0);
   printf("\n");
 
+  free(E_R.data);
   clear_matrix(&sum);
   clear_matrix(&m_i);
   clear_matrix(&K);
-  clear_matrix(&E_R);
   clear_matrix(&E);
   clear_matrix(&m0);
   gmp_randclear(public_random_state);
