@@ -10,7 +10,7 @@ uint scalar_mul(uint a, uint b) { return GF_16_MUL_TABLE[a][b]; }
 
 // used for the `compute_mul` function
 uint compute_double(uint a) {
-  if (a & (1 << 3)) {
+  if (a & 8) {
     return (a << 1) ^ GF_16.polynomial;
   } else {
     return (a << 1);

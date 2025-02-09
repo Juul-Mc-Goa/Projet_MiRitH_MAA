@@ -6,12 +6,12 @@
 typedef unsigned int uint;
 
 typedef struct MinRankInstance {
-  uint solution_size;
+  uint matrix_count;
   Matrix *matrix_array;
 } MinRankInstance;
 
 typedef struct MinRankSolution {
-  uint solution_size;
+  uint matrix_count;
   uint target_rank;
   Matrix alpha;
   Matrix K;
@@ -39,7 +39,7 @@ void share_c_k_and_update(Matrix C, Matrix K, Matrix R, Matrix S,
                           gmp_randstate_t random_state, uint number_of_parties,
                           PartyState *parties);
 void compute_local_m(PartyState *state, MinRankInstance instance,
-                     Matrix local_alpha, uint solution_size);
+                     Matrix local_alpha, uint matrix_count);
 void compute_local_s(PartyState *state, Matrix R, Matrix local_A);
 void compute_global_s(Matrix *S, PartyState *parties, uint length);
 void compute_local_v(PartyState *state, Matrix global_S, Matrix local_K,
@@ -55,8 +55,12 @@ void init_parties(PartyState *parties, uint number_of_parties, uint s,
                   MatrixSize size, uint target_rank);
 void clear_parties(PartyState *parties, uint size);
 
-void init_instance(MinRankInstance *instance, uint solution_size,
+void init_instance(MinRankInstance *instance, uint matrix_count,
                    MatrixSize input_matrix_size);
 void clear_instance(MinRankInstance *instance);
+
+void init_solution(MinRankSolution *solution, uint matrix_count,
+                   uint target_rank, MatrixSize input_matrix_size);
+void clear_solution(MinRankSolution *solution);
 
 #endif // MPC_H_

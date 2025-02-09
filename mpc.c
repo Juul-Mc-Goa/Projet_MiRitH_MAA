@@ -1,9 +1,12 @@
 #include "mpc.h"
 #include "constants.h"
+#include "gmp.h"
+#include "key_generation.h"
 #include "matrix.h"
 #include "random.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Share the vector `alpha` into `number_of_parties` parts, then use
@@ -12,15 +15,18 @@
 void share_alpha_and_update(Matrix alpha, gmp_randstate_t random_state,
                             uint number_of_parties, MinRankInstance instance,
                             PartyState *parties) {
-  uint solution_size = instance.solution_size; // number of input matrices
+  uint matrix_count = instance.matrix_count; // number of input matrices
+
   Matrix local_alpha, alpha_sum;
-  MatrixSize alpha_size = {1, solution_size};
+  MatrixSize alpha_size = {1, matrix_count};
+
   allocate_matrix(&local_alpha, GF_16, alpha_size);
   allocate_matrix(&alpha_sum, GF_16, alpha_size);
+  fill_matrix_with_zero(&alpha_sum);
 
   for (uint i = 0; i < number_of_parties - 1; i++) {
     generate_random_matrix(&local_alpha, random_state, GF_16);
-    compute_local_m(&parties[i], instance, local_alpha, solution_size);
+    compute_local_m(&parties[i], instance, local_alpha, matrix_count);
     matrix_sum(&alpha_sum, alpha_sum, local_alpha);
   }
 
@@ -28,7 +34,7 @@ void share_alpha_and_update(Matrix alpha, gmp_randstate_t random_state,
   matrix_opposite(&alpha_sum);
   matrix_sum(&local_alpha, alpha_sum, alpha);
   compute_local_m(&parties[number_of_parties - 1], instance, local_alpha,
-                  solution_size);
+                  matrix_count);
 
   clear_matrix(&local_alpha);
   clear_matrix(&alpha_sum);
@@ -46,7 +52,6 @@ void share_a_and_update(Matrix A, Matrix R, gmp_randstate_t random_state,
   for (uint i = 0; i < number_of_parties - 1; i++) {
     generate_random_matrix(&local_A, random_state, GF_16);
     matrix_sum(&A_sum, A_sum, local_A);
-
     compute_local_s(&parties[i], R, local_A);
   }
 
@@ -110,7 +115,7 @@ bool mpc_check_solution(gmp_randstate_t random_state, uint number_of_parties,
   MatrixSize size = instance.matrix_array[0].size; // size of each matrix `M_i`
   uint n = size.n,
        s = R.size.m,            // intermediate matrix size
-      r = solution.target_rank; // the rank of the solution
+      r = solution.target_rank; // rank of the solution
 
   PartyState *parties;
   parties = malloc(sizeof(PartyState) * number_of_parties);
@@ -195,43 +200,58 @@ void clear_parties(PartyState *parties, uint size) {
   free(parties);
 }
 
-void init_instance(MinRankInstance *instance, uint solution_size,
+void init_instance(MinRankInstance *instance, uint matrix_count,
                    MatrixSize input_matrix_size) {
-  instance->solution_size = solution_size;
-  instance->matrix_array = malloc(sizeof(Matrix) * solution_size);
+  instance->matrix_count = matrix_count;
+  instance->matrix_array = malloc(sizeof(Matrix) * matrix_count);
 
-  for (uint i = 0; i < solution_size; i++) {
+  for (uint i = 0; i < matrix_count; i++) {
     allocate_matrix(&instance->matrix_array[i], GF_16, input_matrix_size);
   }
 }
 
 void clear_instance(MinRankInstance *instance) {
-  for (uint i = 0; i < instance->solution_size; i++) {
+  for (uint i = 0; i < instance->matrix_count; i++) {
     clear_matrix(&instance->matrix_array[i]);
   }
   free(instance->matrix_array);
 }
 
+void init_solution(MinRankSolution *solution, uint matrix_count,
+                   uint target_rank, MatrixSize input_matrix_size) {
+  solution->matrix_count = matrix_count;
+  solution->target_rank = target_rank;
+  MatrixSize alpha_size = {1, matrix_count};
+  allocate_matrix(&solution->alpha, GF_16, alpha_size);
+  MatrixSize K_size = {target_rank, input_matrix_size.n - target_rank};
+  allocate_matrix(&solution->K, GF_16, K_size);
+}
+
+void clear_solution(MinRankSolution *solution) {
+  clear_matrix(&solution->alpha);
+  clear_matrix(&solution->K);
+}
+
 /* compute the weighted sum of `instance.matrix_array` with `local_alpha`. */
 void compute_local_m(PartyState *state, MinRankInstance instance,
-                     Matrix local_alpha, uint solution_size) {
+                     Matrix local_alpha, uint matrix_count) {
   // split each `instance.matrix_array[i]` into a left and right part
-  Matrix *left_part = malloc(sizeof(Matrix) * solution_size),
-         *right_part = malloc(sizeof(Matrix) * solution_size);
+  Matrix *left_part = malloc(sizeof(Matrix) * matrix_count),
+         *right_part = malloc(sizeof(Matrix) * matrix_count);
 
   // we have to allocate each uint** in the right part
-  for (uint i = 0; i < solution_size; i++) {
+  for (uint i = 0; i < matrix_count; i++) {
     right_part[i].data = malloc(state->M_right.size.m * sizeof(uint *));
   }
 
   split_each_matrix(left_part, right_part, instance.matrix_array,
-                    state->M_right.size.n, instance.solution_size);
+                    state->M_right.size.n, instance.matrix_count);
 
   // compute the weighted sum on each part
   matrix_big_weighted_sum(&state->M_left, local_alpha.data[0], left_part,
-                          instance.solution_size);
+                          instance.matrix_count);
   matrix_big_weighted_sum(&state->M_right, local_alpha.data[0], right_part,
-                          instance.solution_size);
+                          instance.matrix_count);
 }
 
 /* Compute `S = R * M_right + A` */
@@ -241,9 +261,9 @@ void compute_local_s(PartyState *state, Matrix R, Matrix local_A) {
 }
 
 /* Just sum each local `S`. */
-void compute_global_s(Matrix *S, PartyState *parties, uint length) {
+void compute_global_s(Matrix *S, PartyState *parties, uint number_of_parties) {
   fill_matrix_with_zero(S);
-  for (uint i = 0; i < length; i++) {
+  for (uint i = 0; i < number_of_parties; i++) {
     matrix_sum(S, *S, parties[i].S);
   }
 }
@@ -271,9 +291,9 @@ void compute_local_v(PartyState *state, Matrix global_S, Matrix local_K,
 }
 
 /* Just sum each local `V`. */
-void compute_global_v(Matrix *V, PartyState *parties, uint length) {
+void compute_global_v(Matrix *V, PartyState *parties, uint number_of_parties) {
   fill_matrix_with_zero(V);
-  for (uint i = 0; i < length; i++) {
+  for (uint i = 0; i < number_of_parties; i++) {
     matrix_sum(V, *V, parties[i].V);
   }
 }

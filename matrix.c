@@ -95,18 +95,10 @@ void print_matrix(Matrix *m) {
   }
 }
 
-void vector_sum(uint *result, uint length, uint *left, uint *right) {
-  for (uint i = 0; i < length; i++) {
-    result[i] = scalar_add(left[i], right[i]);
-  }
-}
-
-/* Sum 2 matrices, store the output in `result`. */
+/* Sum 2 matrices `left, right`, store the output in `result`. */
 void matrix_sum(Matrix *result, Matrix left, Matrix right) {
-  uint m = left.size.m, n = left.size.n;
-
-  for (uint i = 0; i < m; i++) {
-    for (uint j = 0; j < n; j++) {
+  for (uint i = 0; i < left.size.m; i++) {
+    for (uint j = 0; j < left.size.n; j++) {
       result->data[i][j] = scalar_add(left.data[i][j], right.data[i][j]);
     }
   }
@@ -140,12 +132,6 @@ void matrix_big_weighted_sum(Matrix *result, uint *weights, Matrix *summands,
   }
 }
 
-void vector_opposite(uint *vec, uint length) {
-  for (uint i = 0; i < length; i++) {
-    vec[i] = scalar_neg(vec[i]);
-  }
-}
-
 void matrix_opposite(Matrix *m) {
   for (uint i = 0; i < m->size.m; i++) {
     for (uint j = 0; j < m->size.n; j++) {
@@ -154,7 +140,7 @@ void matrix_opposite(Matrix *m) {
   }
 }
 
-/* Multiply a matrix `m` by a gmp integer `scalar`, store the output in
+/* Multiply a matrix `m` by an integer `scalar`, store the output in
  * `result`. */
 void scalar_product(Matrix *result, uint scalar, Matrix m) {
   for (uint i = 0; i < m.size.m; i++) {
@@ -166,19 +152,20 @@ void scalar_product(Matrix *result, uint scalar, Matrix m) {
 
 /* Multiply two matrices. No check is done on the matrices dimensions.
  * So it is assumed that
- * - `m_left.size.n == m_right.size.m`,
- * - `result.size.m == m_left.size.m`,
- * - `result.size.n == m_right.size.n`. */
-void matrix_product(Matrix *result, Matrix m_left, Matrix m_right) {
-  uint mid_dimension = m_left.size.n;
+ * - `left.size.n == right.size.m`,
+ * - `result.size.m == left.size.m`,
+ * - `result.size.n == right.size.n`. */
+void matrix_product(Matrix *result, Matrix left, Matrix right) {
+  uint mid_dimension = left.size.n;
 
   for (uint i = 0; i < result->size.m; i++) {
     for (uint j = 0; j < result->size.n; j++) {
-      // compute `result[i][j] = 0`
+      // initialize `result[i][j] = 0`
       result->data[i][j] = 0;
       for (uint l = 0; l < mid_dimension; l++) {
-        // compute `result[i][j] += m_left[i][l] * m_right[l][j]`
-        result->data[i][j] ^= scalar_mul(m_left.data[i][l], m_right.data[l][j]);
+        // compute `result[i][j] += left[i][l] * right[l][j]`
+        result->data[i][j] = scalar_add(
+            result->data[i][j], scalar_mul(left.data[i][l], right.data[l][j]));
       }
     }
   }

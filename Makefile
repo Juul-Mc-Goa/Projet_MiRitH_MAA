@@ -15,6 +15,7 @@ export matrix_deps := matrix.o field_arithmetics.o constants.o
 random_matrix_deps := random.o $(matrix_deps)
 export key_gen_deps := key_generation.o $(random_matrix_deps)
 export mpc_deps := mpc.o $(random_matrix_deps)
+export all_deps := mpc.o key_generation.o $(random_matrix_deps)
 
 export key_gen_flags := -lgmp
 export mpc_flags := -lgmp

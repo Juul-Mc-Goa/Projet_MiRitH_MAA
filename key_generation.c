@@ -2,6 +2,7 @@
 #include "field_arithmetics.h"
 #include "matrix.h"
 #include "random.h"
+
 #include <gmp.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -9,30 +10,6 @@
 #include <sys/random.h>
 
 typedef unsigned int uint;
-
-bool *allocate_seed(uint lambda) {
-  bool *result = malloc(lambda * sizeof(bool));
-  return result;
-}
-
-void seed_as_string(char *result, uint lambda, bool *seed) {
-  for (uint i = 0; i < lambda; i++) {
-    result[i] = seed[i] ? '1' : '0';
-  }
-}
-
-void seed_random_state(bool *seed, uint lambda, gmp_randstate_t random_state) {
-  char *seed_str = malloc(lambda * sizeof(char));
-  mpz_t gmp_seed;
-  mpz_init(gmp_seed);
-
-  // public seed
-  seed_as_string(seed_str, lambda, seed);
-  mpz_set_str(gmp_seed, seed_str, 2);
-  gmp_randseed(random_state, gmp_seed);
-
-  free(seed_str);
-}
 
 void allocate_key_pair(PublicPrivateKeyPair *key_pair,
                        SignatureParameters params) {
@@ -51,38 +28,39 @@ void clear_key_pair(PublicPrivateKeyPair key_pair) {
   clear_matrix(&key_pair.public_key.m0);
 }
 
-PublicPrivateKeyPair key_gen(SignatureParameters params) {
+void key_gen(PublicPrivateKeyPair *result, SignatureParameters params) {
   uint lambda = params.lambda;
-  PublicPrivateKeyPair result;
-  allocate_key_pair(&result, params);
 
   // private key generation
-  result.private_key.lambda = lambda;
-  generate_seed(result.private_key.seed, lambda);
+  result->private_key.lambda = lambda;
+  generate_seed(result->private_key.seed, lambda);
+  printf("(keygen) private key: ");
+  for (uint i = 0; i < lambda; i++) {
+    printf("%u ", result->private_key.seed[i]);
+  }
+  printf("\n");
 
   // public key generation
   // 1. seed generation
-  result.public_key.lambda = lambda;
-  generate_seed(result.public_key.seed, lambda);
+  result->public_key.lambda = lambda;
+  generate_seed(result->public_key.seed, lambda);
 
   // 2. random matrix generation
   // 2.1. gmp random state initialization
-  gmp_randstate_t public_random_state;
+  gmp_randstate_t public_random_state, private_random_state;
   gmp_randinit_default(public_random_state);
-
-  gmp_randstate_t private_random_state;
   gmp_randinit_default(private_random_state);
 
   // 2.2. gmp random state seeding
   // public seed
-  seed_random_state(result.public_key.seed, lambda, public_random_state);
+  seed_random_state(result->public_key.seed, lambda, public_random_state);
   // private seed
-  seed_random_state(result.private_key.seed, lambda, private_random_state);
+  seed_random_state(result->private_key.seed, lambda, private_random_state);
 
-  // 2.3. gmp random integer generation
+  // 2.3.  gmp random integer generation
   // 2.3.1 generate M_1, ..., M_k, and field elements alpha_1, ..., alpha_k,
   //       then store sum = alpha_1 * M_1 + ... + alpha_k * M_k
-  uint *alpha = malloc(params.solution_size * sizeof(uint));
+  uint *alpha = malloc((1 + params.solution_size) * sizeof(uint));
   alpha[0] = 1;
 
   Matrix sum;
@@ -110,45 +88,30 @@ PublicPrivateKeyPair key_gen(SignatureParameters params) {
   allocate_matrix(&K, params.field, K_size);
   generate_random_matrix(&K, private_random_state, params.field);
 
-  // 2.3.3 generate a random matrix E_R
-  Matrix E_R;
-  MatrixSize E_R_size = {params.matrix_dimension.m, params.target_rank};
-  allocate_matrix(&E_R, params.field, E_R_size);
+  // 2.3.3 compute E from K and E_R
+  Matrix E, E_L, E_R;
+  allocate_matrix(&E, params.field, params.matrix_dimension);
+  fill_matrix_with_zero(&E);
+
+  E_R.data = malloc(params.matrix_dimension.m * sizeof(uint *));
+  split_matrix(&E_L, &E_R, E, params.target_rank);
+
+  // generate a random matrix E_R
   generate_random_matrix(&E_R, private_random_state, params.field);
 
-  // 2.3.4 compute E from K and E_R
-  Matrix E;
-  allocate_matrix(&E, params.field, params.matrix_dimension);
-
-  // left side: compute E_L = E_R * K
-  // E_L is just a view of E so it does not need to be allocated or freed
-  Matrix E_L;
-  MatrixSize left_size = {E.size.m, K_size.n};
-
-  E_L.field = params.field;
-  E_L.size = left_size;
-  E_L.data = E.data;
+  // compute E_L = E_R * K
   matrix_product(&E_L, E_R, K);
 
-  // right side: copy E_R into E
-  for (uint i = 0; i < E.size.m; i++) {
-    for (uint j = K_size.n; j < E.size.n; j++) {
-      E.data[i][j] = E_R.data[i][j - K_size.n];
-    }
-  }
-
-  // 2.3.5 compute M_0 = E - sum: here field_size is a power of two, so -1 = 1,
+  // 2.3.4 compute M_0 = E - sum: here field_size is a power of two, so -1 = 1,
   // and M_0 = E + sum
   matrix_opposite(&sum);
-  matrix_sum(&result.public_key.m0, E, sum);
+  matrix_sum(&result->public_key.m0, E, sum);
 
+  free(E_R.data);
   clear_matrix(&sum);
   clear_matrix(&m_i);
   clear_matrix(&K);
-  clear_matrix(&E_R);
   clear_matrix(&E);
   gmp_randclear(public_random_state);
   gmp_randclear(private_random_state);
-
-  return result;
 }

@@ -2,6 +2,8 @@
 #include "field_arithmetics.h" // for the `FiniteField` struct
 #include "key_generation.h"    // for the `SignatureParameters` struct
 
+// field_size: 16
+// log(field size): 4
 // polynomial: X^4 + X + 1 = 16 + 2 + 1 = 19
 const FiniteField GF_16 = {16, 4, 19};
 
@@ -10,6 +12,7 @@ const SignatureParameters PARAMS_1_A_FAST = {128, {15, 15}, GF_16, 6,
 const SignatureParameters PARAMS_1_A_SHORT = {128, {15, 15}, GF_16, 6,
                                               78,  9,        256,   19};
 
+// addition table: "a + b" = a ^ b
 const uint GF_16_ADD_TABLE[16][16] = {
     {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
     {1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14},
@@ -29,6 +32,7 @@ const uint GF_16_ADD_TABLE[16][16] = {
     {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0},
 };
 
+// multiplication table
 const uint GF_16_MUL_TABLE[16][16] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
     {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},

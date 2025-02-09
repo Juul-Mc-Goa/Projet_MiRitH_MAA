@@ -42,12 +42,10 @@ typedef struct PublicPrivateKeyPair {
   PrivateKey private_key;
 } PublicPrivateKeyPair;
 
-bool *allocate_seed(uint lambda);
-void seed_random_state(bool *seed, uint lambda, gmp_randstate_t random_state);
-
 void allocate_key_pair(PublicPrivateKeyPair *key_pair,
                        SignatureParameters parameters);
 void clear_key_pair(PublicPrivateKeyPair key_pair);
-PublicPrivateKeyPair key_gen(SignatureParameters params);
+void key_gen(PublicPrivateKeyPair *result,
+                             SignatureParameters params);
 
 #endif // KEY_GENERATION_H_
