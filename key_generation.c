@@ -73,7 +73,6 @@ void key_gen(PublicPrivateKeyPair *result, SignatureParameters params) {
 
     // generate alpha_i
     alpha[i] = generate_random_element(private_random_state, params.field);
-    printf("alpha_%u: %u\n", i, alpha[i]);
 
     // compute sum += alpha_i * M_i
     scalar_product(&m_i, alpha[i], m_i);
