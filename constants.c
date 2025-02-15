@@ -2,6 +2,9 @@
 #include "field_arithmetics.h" // for the `FiniteField` struct
 #include "key_generation.h"    // for the `SignatureParameters` struct
 
+const char HEX_CHAR_TABLE[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
+                               '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
 // field_size: 16
 // log(field size): 4
 // polynomial: X^4 + X + 1 = 16 + 2 + 1 = 19

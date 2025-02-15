@@ -4,6 +4,7 @@
 #include "field_arithmetics.h"
 #include "key_generation.h"
 
+extern const char HEX_CHAR_TABLE[16];
 extern const FiniteField GF_16;
 extern const SignatureParameters PARAMS_1_A_FAST;
 extern const SignatureParameters PARAMS_1_A_SHORT;

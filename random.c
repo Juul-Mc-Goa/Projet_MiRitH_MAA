@@ -5,22 +5,22 @@
 #include "matrix.h"
 #include "mpc.h"
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/random.h>
 
+typedef unsigned char uchar;
+
 /* generate the seed, using the `getrandom` system call (available on Linux) */
 void generate_seed(bool *seed, uint lambda) {
   uint byte_size = 8;
-  uint size = lambda / byte_size;
-  if ((lambda % byte_size) != 0) {
-    size += 1;
-  }
+  uint size = ceil(lambda / 8.0);
 
   // the getrandom function outputs a random array of bytes, that we package
   // in a char* variable. then we unpack it into a boolean array.
-  char *raw_seed = malloc(size);
+  char *raw_seed = malloc(size * sizeof(uchar));
   ssize_t result_size = getrandom(raw_seed, size, 0);
 
   if (result_size != size) {
@@ -38,7 +38,16 @@ void generate_seed(bool *seed, uint lambda) {
   }
 
   free(raw_seed);
-  raw_seed = NULL;
+}
+
+void generate_uchar_seed(uchar *seed, uint lambda) {
+  uint size = ceil(lambda / 8.0);
+  ssize_t result_size = getrandom(seed, size * sizeof(uchar), 0);
+  if (result_size != size) {
+    printf("\nDid not fill the required number of random bytes.\n");
+    printf("requested: %u bytes, filled: %ld bytes\n", size, result_size);
+    return;
+  }
 }
 
 bool *allocate_seed(uint lambda) {
@@ -46,14 +55,38 @@ bool *allocate_seed(uint lambda) {
   return result;
 }
 
+void allocate_uchar_seed(uchar **result, uint lambda) {
+  uint size = ceil(lambda / 8.0);
+  *result = malloc(sizeof(uchar) * size);
+}
+
+/* Pack a boolean array into a string (in hexadecimal). */
 void seed_as_string(char *result, uint lambda, bool *seed) {
-  for (uint i = 0; i < lambda; i++) {
-    result[i] = seed[i] ? '1' : '0';
+  uint result_size = ceil((double)lambda / 4.0);
+
+  uint current_int = 0;
+  uint current_char_index = 0;
+
+  for (uint i = 0; i < (4 * result_size); i++) {
+    // shift by one to the left to make room for the new boolean
+    current_int <<= 1;
+    // assign LSB to the new boolean
+    if (i < lambda) {
+      current_int |= seed[i];
+    }
+    // if we finished processing a 4bit chunk, we update result
+    if ((i & 3) == 3) {
+      result[current_char_index] = HEX_CHAR_TABLE[current_int];
+      current_int = 0;
+      current_char_index += 1;
+    }
   }
 }
 
 void seed_random_state(bool *seed, uint lambda, gmp_randstate_t random_state) {
-  char *seed_str = malloc(lambda * sizeof(char));
+  uint str_size = ceil((double)lambda / 4.0);
+  char *seed_str = malloc(str_size * sizeof(char));
+
   mpz_t gmp_seed;
   mpz_init(gmp_seed);
 

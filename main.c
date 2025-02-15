@@ -1,7 +1,9 @@
+#include "constants.h"
 #include "field_arithmetics.h"
 #include "key_generation.h"
 #include "matrix.h"
 #include "random.h"
+#include "seed_tree.h"
 
 #include <gmp.h>
 #include <openssl/bio.h>
@@ -66,21 +68,50 @@ err:
 }
 
 int main(int argc, char **argv) {
-  // seed generation
   uint lambda = 4;
-  bool *seed = allocate_seed(lambda);
-  generate_seed(seed, lambda);
+  // seed generation
+  /* bool *seed = allocate_seed(lambda); */
+  /* generate_seed(seed, lambda); */
 
-  printf("generated seed:\n");
-  for (uint i = 0; i < 4; i++) {
-    printf("%u: %u\n", i, seed[i]);
+  /* printf("generated seed:\n"); */
+  /* for (uint i = 0; i < 4; i++) { */
+  /*   printf("%u: %u\n", i, seed[i]); */
+  /* } */
+
+  /* // print addition table in GF(16) */
+  /* printf("\n\nAddition Table for GF(16):\n"); */
+  /* print_gf_16_addition_table(); */
+
+  /* // print multiplication table in GF(16) */
+  /* printf("\n\nMultiplication Table for GF(16):\n"); */
+  /* print_gf_16_mul_table(); */
+
+  gmp_randstate_t prg_state;
+  gmp_randinit_default(prg_state);
+  uchar *str_salt, *str_seed;
+
+  allocate_uchar_seed(&str_salt, 2 * lambda);
+  generate_uchar_seed(str_salt, 2 * lambda);
+  printf("generated str_salt\n");
+
+  allocate_uchar_seed(&str_seed, lambda);
+  generate_uchar_seed(str_seed, lambda);
+  printf("generated str_seed\n");
+
+  uint n = 7;
+  uchar **output_seeds = malloc(sizeof(uchar *) * n);
+  for (uint i = 0; i < n; i++) {
+    output_seeds[i] = (uchar *)malloc(lambda * sizeof(uchar));
   }
 
-  // print addition table in GF(16)
-  printf("\n\nAddition Table for GF(16):\n");
-  print_gf_16_addition_table();
+  TreePRG(str_salt, str_seed, lambda, n, output_seeds);
 
-  // print multiplication table in GF(16)
-  printf("\n\nMultiplication Table for GF(16):\n");
-  print_gf_16_mul_table();
+  for (uint i = 0; i < 7; i++) {
+    for (uint j = 0; j < lambda; j++) {
+      uint8_t first_half = (uint8_t)output_seeds[i][j] >> 4;
+      uint8_t second_half = (uint8_t)output_seeds[i][j] & 15;
+      printf("%c%c", HEX_CHAR_TABLE[first_half], HEX_CHAR_TABLE[second_half]);
+    }
+    printf("\n");
+  }
 }
