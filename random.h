@@ -13,6 +13,7 @@ typedef unsigned char uchar;
 
 void allocate_seed(seed_t *seed, uint lambda);
 void clear_seed(seed_t *seed);
+void print_seed(seed_t seed);
 void generate_seed(seed_t seed, uint lambda);
 void seed_to_mpz(uchar *string, size_t string_size, mpz_t *big_int);
 void seed_random_state(seed_t seed, uint lambda, gmp_randstate_t random_state);

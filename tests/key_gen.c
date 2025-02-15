@@ -1,18 +1,14 @@
 #include "../constants.h"
 #include "../key_generation.h"
 #include "../matrix.h"
+#include "../random.h"
 
+#include <stdint.h>
 #include <stdio.h>
 
-void print_seed(bool *seed, uint lambda) {
-  for (uint i = 0; i < lambda; i++) {
-    printf("%u", seed[i]);
-  }
-  printf("\n");
-}
-
 int main(int argc, char **argv) {
-  printf("----------------------------------------------- beginning key generation test...\n");
+  printf("----------------------------------------------- beginning key "
+         "generation test...\n");
   SignatureParameters params;
   params.lambda = 4;
   params.matrix_dimension.m = 3;
@@ -39,7 +35,7 @@ int main(int argc, char **argv) {
   printf("public key:\n");
   printf("- lambda: %u\n", key_pair.public_key.lambda);
   printf("- seed: ");
-  print_seed(key_pair.public_key.seed, key_pair.public_key.lambda);
+  print_seed(key_pair.public_key.seed);
   printf("- matrix m0:\n");
   print_matrix(&key_pair.public_key.m0);
   printf("\n");
@@ -47,7 +43,7 @@ int main(int argc, char **argv) {
   printf("private key:\n");
   printf("- lambda: %u\n", key_pair.private_key.lambda);
   printf("- seed: ");
-  print_seed(key_pair.private_key.seed, key_pair.private_key.lambda);
+  print_seed(key_pair.private_key.seed);
   printf("\n");
 
   printf("finished key generation.\n");

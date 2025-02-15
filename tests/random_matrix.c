@@ -6,7 +6,6 @@
 #include <gmp.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 int main(int argc, char **argv) {
   printf("------------------------------------------------ beginning random "
@@ -20,7 +19,8 @@ int main(int argc, char **argv) {
   gmp_randstate_t random_state;
   gmp_randinit_default(random_state);
   uint lambda = 5;
-  bool *seed = allocate_seed(lambda);
+  seed_t seed;
+  allocate_seed(&seed, lambda);
   generate_seed(seed, lambda);
   seed_random_state(seed, lambda, random_state);
 
@@ -29,5 +29,5 @@ int main(int argc, char **argv) {
 
   clear_matrix(&m);
   gmp_randclear(random_state);
-  free(seed);
+  clear_seed(&seed);
 }

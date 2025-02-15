@@ -40,16 +40,12 @@ int main(int argc, char **argv) {
   allocate_key_pair(&key_pair, params);
   key_gen(&key_pair, params);
   printf("\npublic key:\n- lambda: %u\n- seed: ", key_pair.public_key.lambda);
-  for (uint i = 0; i < key_pair.public_key.lambda; i++) {
-    printf("%u ", key_pair.public_key.seed[i]);
-  }
+  print_seed(key_pair.public_key.seed);
   printf("\n- m0:\n");
   print_matrix(&key_pair.public_key.m0);
 
   printf("\nprivate key:\n- lambda: %u\n- seed: ", key_pair.private_key.lambda);
-  for (uint i = 0; i < key_pair.private_key.lambda; i++) {
-    printf("%u ", key_pair.private_key.seed[i]);
-  }
+  print_seed(key_pair.private_key.seed);
 
   gmp_randstate_t public_random_state, private_random_state;
   gmp_randinit_default(public_random_state);

@@ -28,10 +28,18 @@ void generate_seed(seed_t seed, uint lambda) {
 void allocate_seed(seed_t *seed, uint lambda) {
   uint size = ceil(lambda / 8.0);
   seed->data = malloc(sizeof(uchar) * size);
+  seed->size = size;
 }
 
-void clear_seed(seed_t *seed) {
-  free(seed->data);
+void clear_seed(seed_t *seed) { free(seed->data); }
+
+void print_seed(seed_t seed) {
+  for (uint i = 0; i < seed.size; i++) {
+    char left_char = HEX_CHAR_TABLE[(uint8_t)seed.data[i] >> 4];
+    char right_char = HEX_CHAR_TABLE[(uint8_t)seed.data[i] & 15];
+    printf("%c%c ", left_char, right_char);
+  }
+  printf("\n");
 }
 
 /* Convert a byte array into a GMP integer. */
