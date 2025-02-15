@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
   seed_t seed;
   allocate_seed(&seed, lambda);
   generate_seed(seed, lambda);
-  seed_random_state(seed, lambda, random_state);
+  seed_random_state(seed, random_state);
 
   generate_random_matrix(&m, random_state, field);
   print_matrix(&m);

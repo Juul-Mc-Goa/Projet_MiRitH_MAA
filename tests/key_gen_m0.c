@@ -35,12 +35,10 @@ int main(int argc, char **argv) {
 
   // public seed
   gmp_randinit_default(public_random_state);
-  seed_random_state(key_pair.public_key.seed, params.lambda,
-                    public_random_state);
+  seed_random_state(key_pair.public_key.seed, public_random_state);
   // private seed
   gmp_randinit_default(private_random_state);
-  seed_random_state(key_pair.private_key.seed, params.lambda,
-                    private_random_state);
+  seed_random_state(key_pair.private_key.seed, private_random_state);
   uint *alpha = malloc(params.solution_size * sizeof(uint));
   alpha[0] = 1;
 

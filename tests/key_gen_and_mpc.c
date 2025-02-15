@@ -11,8 +11,8 @@
 #include <stdio.h>
 
 int main(int argc, char **argv) {
-  printf("--------------------------------------- beginning the mpc check "
-         "solution test...\n");
+  printf("--------------------------------------- beginning the keygen and mpc"
+         " test...\n");
   // define the signature parameters
   SignatureParameters params;
   params.lambda = 4;
@@ -51,10 +51,8 @@ int main(int argc, char **argv) {
   gmp_randinit_default(public_random_state);
   gmp_randinit_default(private_random_state);
 
-  seed_random_state(key_pair.private_key.seed, key_pair.private_key.lambda,
-                    private_random_state);
-  seed_random_state(key_pair.public_key.seed, key_pair.public_key.lambda,
-                    public_random_state);
+  seed_random_state(key_pair.private_key.seed, private_random_state);
+  seed_random_state(key_pair.public_key.seed, public_random_state);
 
   // unpack MinRank instance
   MinRankInstance instance;

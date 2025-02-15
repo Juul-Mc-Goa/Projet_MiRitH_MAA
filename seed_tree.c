@@ -11,21 +11,6 @@
 
 typedef unsigned char uchar;
 
-/* Convert a byte array into a GMP integer. */
-void string_to_mpz(uchar *string, size_t string_size, mpz_t *big_int) {
-  // each uchar is converted to 2 hex digits
-  char *hex_string = malloc(sizeof(char) * 2 * string_size);
-
-  for (uint i = 0; i < string_size; i++) {
-    hex_string[2 * i] = HEX_CHAR_TABLE[(uint8_t)string[i] >> 4];
-    hex_string[2 * i + 1] = HEX_CHAR_TABLE[(uint8_t)string[i] & 15];
-  }
-
-  mpz_set_str(*big_int, hex_string, 16);
-
-  free(hex_string);
-}
-
 // Function to initialize the PRG state
 void PRG_init(const seed_t *salt, const seed_t *seed, uint lambda,
               gmp_randstate_t *prg_state) {

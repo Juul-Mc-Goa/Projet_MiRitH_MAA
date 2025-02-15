@@ -51,9 +51,9 @@ void key_gen(PublicPrivateKeyPair *result, SignatureParameters params) {
 
   // 2.2. gmp random state seeding
   // public seed
-  seed_random_state(result->public_key.seed, lambda, public_random_state);
+  seed_random_state(result->public_key.seed, public_random_state);
   // private seed
-  seed_random_state(result->private_key.seed, lambda, private_random_state);
+  seed_random_state(result->private_key.seed, private_random_state);
 
   // 2.3.  gmp random integer generation
   // 2.3.1 generate M_1, ..., M_k, and field elements alpha_1, ..., alpha_k,
@@ -73,6 +73,7 @@ void key_gen(PublicPrivateKeyPair *result, SignatureParameters params) {
 
     // generate alpha_i
     alpha[i] = generate_random_element(private_random_state, params.field);
+    printf("alpha_%u: %u\n", i, alpha[i]);
 
     // compute sum += alpha_i * M_i
     scalar_product(&m_i, alpha[i], m_i);

@@ -45,29 +45,25 @@ void print_seed(seed_t seed) {
 /* Convert a byte array into a GMP integer. */
 void seed_to_mpz(uchar *string, size_t string_size, mpz_t *big_int) {
   // each uchar is converted to 2 hex digits
-  char *hex_string = malloc(sizeof(char) * 2 * string_size);
+  char *hex_string = malloc(sizeof(char) * (2 * string_size + 1));
 
   for (uint i = 0; i < string_size; i++) {
     hex_string[2 * i] = HEX_CHAR_TABLE[(uint8_t)string[i] >> 4];
     hex_string[2 * i + 1] = HEX_CHAR_TABLE[(uint8_t)string[i] & 15];
   }
+  hex_string[2 * string_size] = (char)0;
 
   mpz_set_str(*big_int, hex_string, 16);
 
   free(hex_string);
 }
 
-void seed_random_state(seed_t seed, uint lambda, gmp_randstate_t random_state) {
-  uint str_size = ceil((double)lambda / 4.0);
-  char *seed_str = malloc(str_size * sizeof(char));
-
+void seed_random_state(seed_t seed, gmp_randstate_t random_state) {
   mpz_t gmp_seed;
   mpz_init(gmp_seed);
 
   seed_to_mpz(seed.data, seed.size, &gmp_seed);
   gmp_randseed(random_state, gmp_seed);
-
-  free(seed_str);
 }
 
 /* Generate a random element in `field`. */
