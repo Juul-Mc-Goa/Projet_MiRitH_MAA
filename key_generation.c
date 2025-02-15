@@ -35,13 +35,13 @@ void key_gen(PublicPrivateKeyPair *result, SignatureParameters params) {
   // private key generation
   result->private_key.lambda = lambda;
   allocate_seed(&result->private_key.seed, lambda);
-  generate_seed(result->private_key.seed, lambda);
+  generate_seed(result->private_key.seed);
 
   // public key generation
   // 1. seed generation
   result->public_key.lambda = lambda;
   allocate_seed(&result->public_key.seed, lambda);
-  generate_seed(result->public_key.seed, lambda);
+  generate_seed(result->public_key.seed);
 
   // 2. random matrix generation
   // 2.1. gmp random state initialization

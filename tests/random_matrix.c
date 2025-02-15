@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
   uint lambda = 5;
   seed_t seed;
   allocate_seed(&seed, lambda);
-  generate_seed(seed, lambda);
+  generate_seed(seed);
   seed_random_state(seed, random_state);
 
   generate_random_matrix(&m, random_state, field);
