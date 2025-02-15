@@ -1,17 +1,304 @@
 #include "constants.h"
-#include "key_generation.h"
 #include "matrix.h"
 #include "mpc.h"
+#include "packing.h"
 #include "random.h"
-#include "seed_tree.h"
-#include "types.h"
 
-#include <gmp.h>
-#include <math.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
+#include <openssl/bio.h>
+#include <openssl/crypto.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
 
+
+void allocate_commit(uchar *commit, uint lambda) {
+  commit = malloc(sizeof(uchar) * lambda);
+}
+
+/* applies SHA3 to `(salt, l, i, state)` */
+int hash0(uchar *digest, EVP_MD_CTX *context, seed_t salt, uint lambda, uint l,
+          uint i, seed_t state) {
+  int ret = 1;
+  // allocate `msg`
+  uint salt_size = lambda >> 2, int_size = 32, state_size = lambda >> 3;
+  uint total_size = salt_size + 2 * int_size + state_size;
+  uchar *msg = malloc(sizeof(uchar) * total_size);
+
+  uint bit_index = 0;
+  msg[0] = (uchar)0;
+  // pack `salt`
+  for (uint j = 0; j < 2 * lambda; j++) {
+    pack_boolean(msg, salt.data[j], &bit_index);
+  }
+  // pack `l, i`
+  pack_32bit_value(msg, l, &bit_index);
+  pack_32bit_value(msg, i, &bit_index);
+  // pack `state`
+  for (uint j = 0; j < lambda; j++) {
+    pack_boolean(msg, state.data[j], &bit_index);
+  }
+  // pass the message to be digested
+  if (!EVP_DigestUpdate(context, msg, sizeof(msg)))
+    goto err;
+
+  // calculate the digest
+  if (!EVP_DigestFinal_ex(context, digest, NULL))
+    goto err;
+
+  ret = 0;
+
+err:
+  /* Clean up all the resources we allocated */
+  free(msg);
+  if (ret != 0)
+    ERR_print_errors_fp(stderr);
+  return ret;
+}
+
+/* applies SHA3 to `(salt, l, i, alpha, K, C)` */
+int hash0_last(uchar *digest, EVP_MD_CTX *context, seed_t salt, uint lambda,
+               uint l, uint i, seed_t seed, Matrix alpha, Matrix K, Matrix C) {
+  int ret = 1;
+
+  // compute various sizes to obtain the length of `msg`
+  uint salt_size = lambda >> 2;
+  uint seed_size = lambda >> 3;
+  uint int_size = 32;
+
+  uint alpha_size = alpha.size.n;
+  uint K_length = K.size.m * K.size.n;
+  uint C_length = C.size.m * C.size.n;
+  uint total_matrices_length = alpha_size + K_length + C_length;
+
+  uint total_size = salt_size + 2 * int_size + seed_size;
+  total_size += (total_matrices_length >> 1);
+  if ((total_matrices_length & 1) != 0) {
+    total_size += 1;
+  }
+
+  // allocate `msg`
+  uchar *msg = malloc(sizeof(uchar) * total_size);
+  pack_last_state(msg, salt, lambda, l, i, alpha, K, C);
+
+  // pass the message to be digested
+  if (!EVP_DigestUpdate(context, msg, sizeof(msg)))
+    goto err;
+
+  // calculate the digest
+  if (!EVP_DigestFinal_ex(context, digest, NULL))
+    goto err;
+
+  ret = 0;
+
+err:
+  /* Clean up all the resources we allocated */
+  free(msg);
+  if (ret != 0)
+    ERR_print_errors_fp(stderr);
+  return ret;
+}
+
+/* Concatenate `message, salt` and each `commits[i][j]` before applying SHA3. */
+int hash1(uchar *digest, EVP_MD_CTX *context, uchar *message, uint message_size,
+          uchar *salt, uint lambda, uint number_of_rounds,
+          uint number_of_parties, uchar ***commits) {
+  int ret = 1;
+  // `salt` has 2 * lambda booleans, packed into lambda / 4 `uchar`s
+  uint salt_size = lambda >> 2;
+  uchar *msg = malloc(sizeof(uchar) * salt_size);
+
+  // pass `message` to the context
+  if (!EVP_DigestUpdate(context, message, sizeof(message)))
+    goto err;
+
+  // pack `salt` into `msg`
+  uint bit_index = 0;
+  for (uint i = 0; i < message_size; i++) {
+    pack_boolean(msg, salt[i], &bit_index);
+  }
+
+  // pass `msg` to the context
+  if (!EVP_DigestUpdate(context, msg, sizeof(msg)))
+    goto err;
+
+  // pass `commit` to the context
+  for (uint i = 0; i < number_of_rounds; i++) {
+    for (uint j = 0; j < number_of_parties; j++) {
+      if (!EVP_DigestUpdate(context, commits[i][j], sizeof(commits[i][j])))
+        goto err;
+    }
+  }
+
+  if (!EVP_DigestFinal_ex(context, digest, NULL))
+    goto err;
+
+err:
+  free(msg);
+  if (ret != 0)
+    ERR_print_errors_fp(stderr);
+  return ret;
+}
+
+/* Phase one: generate `params.tau` instances of the MPC protocol. The
+ * result is stored in `commits`: a 2D array of SHA3 digests. */
+int phase_one(uchar ***commits, SignatureParameters params,
+              MinRankInstance instance, MinRankSolution solution) {
+  // unpack `params`
+  uint number_of_parties = params.number_of_parties, lambda = params.lambda,
+       tau = params.tau, matrix_count = params.solution_size + 1;
+  uint ret = 1;
+
+  EVP_MD_CTX *random_state;
+  initialize_shake256(&random_state);
+
+  // generate salt
+  seed_t salt;
+  allocate_seed(&salt, 2 * lambda);
+  generate_seed(salt);
+
+  seed_t current_round_seed, current_party_seed;
+  allocate_seed(&current_round_seed, lambda);
+  allocate_seed(&current_party_seed, lambda);
+
+  // initialize context for hashes (used in `commits`)
+  EVP_MD_CTX *hash_context = NULL;
+  ret = initialize_sha3(&hash_context, lambda);
+  if (ret != 0)
+    goto err;
+
+  // create various matrices
+  Matrix alpha, alpha_sum, A, A_sum, C, C_sum, K, K_sum;
+  MatrixSize alpha_size = {1, matrix_count},
+             A_size = {params.first_challenge_size, params.target_rank},
+             K_size = {params.target_rank,
+                       params.matrix_dimension.n - params.target_rank},
+             C_size = {A_size.m, K_size.n};
+
+  allocate_matrix(&alpha, GF_16, alpha_size);
+  allocate_matrix(&alpha_sum, GF_16, alpha_size);
+
+  allocate_matrix(&A, GF_16, A_size);
+  allocate_matrix(&A_sum, GF_16, A_size);
+
+  allocate_matrix(&K, GF_16, K_size);
+  allocate_matrix(&K_sum, GF_16, K_size);
+
+  allocate_matrix(&C, GF_16, C_size);
+  allocate_matrix(&C_sum, GF_16, C_size);
+
+  // for each round
+  for (uint l = 0; l < tau; l++) {
+    fill_matrix_with_zero(&A_sum);
+    fill_matrix_with_zero(&alpha_sum);
+    fill_matrix_with_zero(&K_sum);
+    fill_matrix_with_zero(&C_sum);
+
+    // generate a seed
+    generate_seed(current_round_seed);
+
+    // use this seed to generate `number_of_parties` seeds
+    for (uint i = 0; i < number_of_parties - 1; i++) {
+      generate_seed_from_randstate(current_party_seed, salt, current_round_seed,
+                                   lambda, &random_state);
+      // use this fresh seed to generate A, alpha, K, C
+      seed_random_state(current_party_seed, &hash_context);
+      generate_random_matrix(&A, random_state, GF_16);
+      generate_random_matrix(&alpha, random_state, GF_16);
+      generate_random_matrix(&K, random_state, GF_16);
+      generate_random_matrix(&C, random_state, GF_16);
+
+      // update `{matrix}_sum`
+      matrix_sum(&alpha_sum, alpha_sum, alpha);
+      matrix_sum(&A_sum, A_sum, A);
+      matrix_sum(&K_sum, K_sum, K);
+      matrix_sum(&C_sum, C_sum, C);
+
+      // store the commit
+      allocate_hash_digest(&commits[l][i], hash_context, lambda);
+
+      if (commits[l][i] == NULL)
+        goto err;
+
+      ret = hash0(commits[i][l], hash_context, salt, lambda, l, i,
+                  current_party_seed);
+
+      if (ret != 0)
+        goto err;
+    }
+    // last party is special: we need to enforce various relations
+    generate_seed_from_randstate(current_party_seed, salt, current_round_seed,
+                                 lambda, &random_state);
+    seed_random_state(current_party_seed, &random_state);
+    // generate last A
+    generate_random_matrix(&A, random_state, GF_16);
+    // compute last alpha, K, C
+    matrix_sum(&alpha, solution.alpha, alpha_sum);
+    matrix_sum(&K, solution.K, K_sum);
+    matrix_product(&C, A, K);
+    matrix_sum(&C, C, C_sum);
+    allocate_hash_digest(&commits[l][number_of_parties - 1], hash_context,
+                         lambda);
+
+    if (commits[l][number_of_parties - 1] == NULL)
+      goto err;
+
+    ret = hash0_last(commits[l][number_of_parties - 1], hash_context, salt,
+                     lambda, l, number_of_parties - 1, current_party_seed,
+                     alpha, K, C);
+
+    if (ret != 0)
+      goto err;
+  }
+
+  // TODO: execute MPC protocol, store the shares of S and V
+  // TODO: compute h2: hash of `msg || salt || (S, V)_i`
+  //       use it to generate second challenges
+  // TODO: output `h1 || h2 || (almost each (state_i, com_i, S_i))`
+
+err:
+  clear_seed(&current_round_seed);
+  clear_seed(&current_party_seed);
+  clear_matrix(&alpha);
+  clear_matrix(&alpha_sum);
+  clear_matrix(&A);
+  clear_matrix(&A_sum);
+  clear_matrix(&C);
+  clear_matrix(&C_sum);
+  clear_matrix(&K);
+  clear_matrix(&K_sum);
+
+  EVP_MD_CTX_free(hash_context);
+  EVP_MD_CTX_free(random_state);
+  if (ret != 0)
+    ERR_print_errors_fp(stderr);
+  return ret;
+}
+
+/* Compute a hash of `message || salt || commits`, then use it to create
+ * the challenges for each round. */
+int phase_two(Matrix *challenges, uchar *message, uint message_size,
+              uint number_of_rounds, uint number_of_parties, uint lambda,
+              uchar *salt, uchar ***commits) {
+  uint ret = 1;
+
+  // compute the hash
+  EVP_MD_CTX *context = NULL;
+  ret = initialize_sha3(&context, lambda);
+  if (ret != 0)
+    goto err;
+
+  uchar *digest;
+  allocate_hash_digest(&digest, context, lambda);
+  hash1(digest, context, message, message_size, salt, lambda, number_of_rounds,
+        number_of_parties, commits);
+
+  // create the challenges
+
+err:
+  EVP_MD_CTX_free(context);
+  if (ret != 0)
+    ERR_print_errors_fp(stderr);
+  return ret;
+}
 void allocate_party_seeds(uchar **party_seeds, uint number_of_parties,
                           uint lambda) {
   size_t seed_size = (size_t)ceil(lambda / 8.0);
