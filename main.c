@@ -68,7 +68,7 @@ err:
 }
 
 int main(int argc, char **argv) {
-  uint lambda = 4;
+  uint lambda = 8 * 4;
   // seed generation
   /* bool *seed = allocate_seed(lambda); */
   /* generate_seed(seed, lambda); */
@@ -88,14 +88,14 @@ int main(int argc, char **argv) {
 
   gmp_randstate_t prg_state;
   gmp_randinit_default(prg_state);
-  uchar *str_salt, *str_seed;
+  seed_t salt, seed;
 
-  allocate_uchar_seed(&str_salt, 2 * lambda);
-  generate_uchar_seed(str_salt, 2 * lambda);
+  allocate_seed(&salt, 2 * lambda);
+  generate_seed(salt, 2 * lambda);
   printf("generated str_salt\n");
 
-  allocate_uchar_seed(&str_seed, lambda);
-  generate_uchar_seed(str_seed, lambda);
+  allocate_seed(&seed, 2 * lambda);
+  generate_seed(seed, 2 * lambda);
   printf("generated str_seed\n");
 
   uint n = 7;
@@ -104,10 +104,10 @@ int main(int argc, char **argv) {
     output_seeds[i] = (uchar *)malloc(lambda * sizeof(uchar));
   }
 
-  TreePRG(str_salt, str_seed, lambda, n, output_seeds);
+  TreePRG(&salt, &seed, lambda, n, output_seeds);
 
   for (uint i = 0; i < 7; i++) {
-    for (uint j = 0; j < lambda; j++) {
+    for (uint j = 0; j < lambda>> 3; j++) {
       uint8_t first_half = (uint8_t)output_seeds[i][j] >> 4;
       uint8_t second_half = (uint8_t)output_seeds[i][j] & 15;
       printf("%c%c", HEX_CHAR_TABLE[first_half], HEX_CHAR_TABLE[second_half]);

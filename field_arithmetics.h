@@ -1,13 +1,8 @@
 #ifndef FIELD_ARITHMETICS_H_
 #define FIELD_ARITHMETICS_H_
 
+#include "types.h"
 typedef unsigned int uint;
-
-typedef struct FiniteField {
-  uint field_size;
-  uint log_field_size;
-  uint polynomial;
-} FiniteField;
 
 uint scalar_add(uint a, uint b);
 uint scalar_neg(uint a);

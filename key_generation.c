@@ -14,17 +14,18 @@ typedef unsigned int uint;
 void allocate_key_pair(PublicPrivateKeyPair *key_pair,
                        SignatureParameters params) {
   key_pair->private_key.lambda = params.lambda;
-  key_pair->private_key.seed = malloc(params.lambda * sizeof(bool));
+  allocate_seed(&key_pair->private_key.seed, params.lambda);
 
   key_pair->public_key.lambda = params.lambda;
-  key_pair->public_key.seed = malloc(params.lambda * sizeof(bool));
+  allocate_seed(&key_pair->public_key.seed, params.lambda);
+
   allocate_matrix(&key_pair->public_key.m0, params.field,
                   params.matrix_dimension);
 }
 
 void clear_key_pair(PublicPrivateKeyPair key_pair) {
-  free(key_pair.private_key.seed);
-  free(key_pair.public_key.seed);
+  clear_seed(&key_pair.private_key.seed);
+  clear_seed(&key_pair.public_key.seed);
   clear_matrix(&key_pair.public_key.m0);
 }
 
@@ -36,7 +37,7 @@ void key_gen(PublicPrivateKeyPair *result, SignatureParameters params) {
   generate_seed(result->private_key.seed, lambda);
   printf("(keygen) private key: ");
   for (uint i = 0; i < lambda; i++) {
-    printf("%u ", result->private_key.seed[i]);
+    printf("%u ", result->private_key.seed.data[i]);
   }
   printf("\n");
 

@@ -2,27 +2,7 @@
 #define MPC_H_
 
 #include "matrix.h"
-
-typedef unsigned int uint;
-
-typedef struct MinRankInstance {
-  uint matrix_count;
-  Matrix *matrix_array;
-} MinRankInstance;
-
-typedef struct MinRankSolution {
-  uint matrix_count;
-  uint target_rank;
-  Matrix alpha;
-  Matrix K;
-} MinRankSolution;
-
-typedef struct PartyState {
-  Matrix M_left;
-  Matrix M_right;
-  Matrix S;
-  Matrix V;
-} PartyState;
+#include "types.h"
 
 /* Main function */
 bool mpc_check_solution(gmp_randstate_t random_state, uint number_of_parties,

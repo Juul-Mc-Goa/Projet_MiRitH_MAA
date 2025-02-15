@@ -2,21 +2,10 @@
 #define MATRIX_H_
 
 #include "field_arithmetics.h"
+#include "types.h"
+
 #include <gmp.h>
 #include <stdbool.h>
-
-typedef unsigned int uint;
-
-typedef struct MatrixSize {
-  uint m;
-  uint n;
-} MatrixSize;
-
-typedef struct Matrix {
-  uint **data;
-  FiniteField field;
-  MatrixSize size;
-} Matrix;
 
 void allocate_matrix(Matrix *result, FiniteField field, MatrixSize size);
 void copy_into_matrix(Matrix *m, uint **array);

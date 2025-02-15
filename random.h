@@ -11,12 +11,11 @@
 
 typedef unsigned char uchar;
 
-bool *allocate_seed(uint lambda);
-void allocate_uchar_seed(uchar **result, uint lambda);
-void generate_seed(bool *seed, uint lambda);
-void generate_uchar_seed(uchar *seed, uint lambda);
-void seed_random_state(bool *seed, uint lambda, gmp_randstate_t random_state);
-
+void allocate_seed(seed_t *seed, uint lambda);
+void clear_seed(seed_t *seed);
+void generate_seed(seed_t seed, uint lambda);
+void seed_to_mpz(uchar *string, size_t string_size, mpz_t *big_int);
+void seed_random_state(seed_t seed, uint lambda, gmp_randstate_t random_state);
 uint generate_random_element(gmp_randstate_t random_state, FiniteField field);
 void generate_random_matrix(Matrix *m, gmp_randstate_t random_state,
                             FiniteField field);
