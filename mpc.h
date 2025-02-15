@@ -5,9 +5,8 @@
 #include "types.h"
 
 /* Main function */
-bool mpc_check_solution(gmp_randstate_t random_state, uint number_of_parties,
-                        Matrix R, MinRankInstance instance,
-                        MinRankSolution solution);
+bool mpc_check_solution(gmp_randstate_t random_state, uint number_of_parties, Matrix R,
+                        MinRankInstance instance, MinRankSolution solution);
 
 /* Utilities used by `mpc_check_solution` */
 void share_alpha_and_update(Matrix alpha, gmp_randstate_t random_state,
@@ -31,8 +30,8 @@ void init_party_state(PartyState *state, uint s, MatrixSize size,
                       uint target_rank);
 void clear_party_state(PartyState *s);
 
-void init_parties(PartyState *parties, uint number_of_parties, uint s,
-                  MatrixSize size, uint target_rank);
+void init_parties(PartyState *parties, uint number_of_parties,
+                  uint s, MatrixSize size, uint target_rank);
 void clear_parties(PartyState *parties, uint size);
 
 void init_instance(MinRankInstance *instance, uint matrix_count,

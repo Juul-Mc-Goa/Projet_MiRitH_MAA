@@ -1,3 +1,4 @@
+#include "sign.h"
 #include "random.h"
 #include "constants.h"
 #include "gmp.h"
@@ -15,12 +16,11 @@
 typedef unsigned char uchar;
 
 /* generate the seed, using the `getrandom` system call (available on Linux) */
-void generate_seed(seed_t seed, uint lambda) {
-  uint size = ceil(lambda / 8.0);
-  ssize_t result_size = getrandom(seed.data, size * sizeof(uchar), 0);
-  if (result_size != size) {
+void generate_seed(seed_t seed) {
+  ssize_t result_size = getrandom(seed.data, seed.size * sizeof(uchar), 0);
+  if (result_size != seed.size) {
     printf("\nDid not fill the required number of random bytes.\n");
-    printf("requested: %u bytes, filled: %ld bytes\n", size, result_size);
+    printf("requested: %u bytes, filled: %ld bytes\n", seed.size, result_size);
     return;
   }
 }
@@ -93,37 +93,5 @@ void generate_random_instance(MinRankInstance *instance, uint matrix_count,
                               gmp_randstate_t random_state, FiniteField field) {
   for (uint i = 0; i < matrix_count; i++) {
     generate_random_matrix(&instance->matrix_array[i], random_state, field);
-  }
-}
-
-/* Unpack a `MinRankSolution` from the given private key. The `solution`
- * must be initialized (by `init_solution` for example). This uses
- * `priv_key.seed` to seed a random state, then generates random `alpha` and
- * `K`. */
-void unpack_solution_from_private_key(MinRankSolution *solution,
-                                      gmp_randstate_t random_state,
-                                      SignatureParameters params,
-                                      PrivateKey priv_key) {
-  solution->alpha.data[0][0] = 1;
-  for (uint i = 1; i <= params.solution_size; i++) {
-    solution->alpha.data[0][i] =
-        generate_random_element(random_state, params.field);
-  }
-
-  generate_random_matrix(&solution->K, random_state, params.field);
-}
-
-void unpack_instance_from_public_key(MinRankInstance *instance,
-                                     gmp_randstate_t random_state,
-                                     SignatureParameters params,
-                                     PublicKey pub_key) {
-  instance->matrix_count = params.solution_size + 1;
-
-  // copy `m0` from the public key
-  matrix_init_set(&instance->matrix_array[0], pub_key.m0);
-
-  for (uint i = 1; i <= params.solution_size; i++) {
-    generate_random_matrix(&instance->matrix_array[i], random_state,
-                           params.field);
   }
 }

@@ -4,6 +4,7 @@
 #include "key_generation.h"
 #include "matrix.h"
 #include "random.h"
+#include "types.h"
 
 #include <stdbool.h>
 #include <stdio.h>

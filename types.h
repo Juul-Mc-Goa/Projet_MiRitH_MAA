@@ -85,4 +85,12 @@ typedef struct PartyState {
   Matrix V;
 } PartyState;
 
+typedef struct PartyData {
+  Matrix alpha;
+  Matrix A;
+  Matrix R;
+  Matrix C;
+  Matrix K;
+} PartyData;
+
 #endif // TYPES_H_

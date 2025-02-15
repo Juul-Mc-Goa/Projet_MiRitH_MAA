@@ -2,13 +2,17 @@
 #include "field_arithmetics.h"
 #include "key_generation.h"
 #include "matrix.h"
+#include "packing.h"
 #include "random.h"
 #include "seed_tree.h"
+#include "sign.h"
+#include "types.h"
 
-#include <gmp.h>
+#include <math.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <stdint.h>
 
 int test_keccak_digest() {
   EVP_MD_CTX *ctx = NULL; // Message Digest context
@@ -68,50 +72,43 @@ err:
 }
 
 int main(int argc, char **argv) {
-  uint lambda = 8 * 4;
-  // seed generation
-  /* bool *seed = allocate_seed(lambda); */
-  /* generate_seed(seed, lambda); */
+  SignatureParameters params;
+  params.lambda = 4;
+  params.matrix_dimension.m = 3;
+  params.matrix_dimension.n = 3;
+  params.field = GF_16;
+  params.target_rank = 1;
+  params.solution_size = 4;
+  params.first_challenge_size = 2;
+  params.number_of_parties = 2;
+  params.tau = 2;
 
-  /* printf("generated seed:\n"); */
-  /* for (uint i = 0; i < 4; i++) { */
-  /*   printf("%u: %u\n", i, seed[i]); */
-  /* } */
+  uint seed_size = (uint)ceil(params.lambda / 8.0);
 
-  /* // print addition table in GF(16) */
-  /* printf("\n\nAddition Table for GF(16):\n"); */
-  /* print_gf_16_addition_table(); */
+  uchar ***commits = malloc(sizeof(uchar **) * params.tau);
+  for (uint round = 0; round < params.tau; round++) {
+    commits[round] = malloc(sizeof(uchar *) * params.number_of_parties);
+    for (uint party = 0; party < params.number_of_parties - 1; party++) {
+      commits[round][party] = malloc(sizeof(uchar) * seed_size);
+    }
+  }
 
-  /* // print multiplication table in GF(16) */
-  /* printf("\n\nMultiplication Table for GF(16):\n"); */
-  /* print_gf_16_mul_table(); */
+  // generate the keys
+  PublicPrivateKeyPair key_pair;
+  allocate_key_pair(&key_pair, params);
+  key_gen(&key_pair, params);
 
   gmp_randstate_t prg_state;
   gmp_randinit_default(prg_state);
-  seed_t salt, seed;
+  MinRankInstance instance;
+  generate_random_instance(&instance, params.solution_size, prg_state, GF_16);
 
-  allocate_seed(&salt, 2 * lambda);
-  generate_seed(salt, 2 * lambda);
-  printf("generated str_salt\n");
+  unpack_instance_from_public_key(&instance, prg_state, params,
+                                  key_pair.public_key);
 
-  allocate_seed(&seed, 2 * lambda);
-  generate_seed(seed, 2 * lambda);
-  printf("generated str_seed\n");
+  MinRankSolution solution;
+  unpack_solution_from_private_key(&solution, prg_state, params,
+                                   key_pair.private_key);
 
-  uint n = 7;
-  uchar **output_seeds = malloc(sizeof(uchar *) * n);
-  for (uint i = 0; i < n; i++) {
-    output_seeds[i] = (uchar *)malloc(lambda * sizeof(uchar));
-  }
-
-  TreePRG(&salt, &seed, lambda, n, output_seeds);
-
-  for (uint i = 0; i < 7; i++) {
-    for (uint j = 0; j < lambda>> 3; j++) {
-      uint8_t first_half = (uint8_t)output_seeds[i][j] >> 4;
-      uint8_t second_half = (uint8_t)output_seeds[i][j] & 15;
-      printf("%c%c", HEX_CHAR_TABLE[first_half], HEX_CHAR_TABLE[second_half]);
-    }
-    printf("\n");
-  }
+  // TODO: Apply phase_one, phase_two, phase_three
 }
