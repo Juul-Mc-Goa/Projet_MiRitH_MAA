@@ -6,6 +6,7 @@
 #include "../key_generation.h"
 #include "../mpc.h"
 #include "../random.h"
+#include "../packing.h"
 
 #include <gmp.h>
 #include <stdio.h>
