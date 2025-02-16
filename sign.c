@@ -2,6 +2,7 @@
 #include "gmp.h"
 #include "matrix.h"
 #include "mpc.h"
+#include "openssl/cryptoerr_legacy.h"
 #include "packing.h"
 #include "random.h"
 #include "seed_tree.h"
@@ -12,50 +13,51 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <stdio.h>
+#include <string.h>
 
-void allocate_commit(uchar *commit, uint lambda) {
-  commit = malloc(sizeof(uchar) * (uint)ceil(lambda / 8.0));
+void allocate_commit(uchar **commit, uint lambda) {
+  *commit = OPENSSL_malloc(EVP_MD_size(EVP_sha3_256()));
 }
 
-void allocate_all_commits(uchar ***commits, SignatureParameters params) {
+void allocate_all_commits(uchar ****commits, SignatureParameters params) {
   uint lambda = params.lambda;
   uint rounds = params.tau;
   uint N = params.number_of_parties;
 
-  commits = malloc(sizeof(uchar **) * rounds);
+  *commits = malloc(sizeof(uchar **) * rounds);
+  uchar ***commits_value = *commits;
   for (uint round = 0; round < rounds; round++) {
-    commits[round] = malloc(sizeof(uchar *) * N);
-    for (uint party; party < N; party++) {
-      allocate_commit(commits[round][party], lambda);
+    commits_value[round] = malloc(sizeof(uchar *) * N);
+    for (uint party = 0; party < N; party++) {
+      allocate_commit(&commits_value[round][party], lambda);
     }
   }
 }
 
-void allocate_all_party_data(PartyData **data, SignatureParameters params) {
+void allocate_all_party_data(PartyData ***data, SignatureParameters params) {
   uint N = params.number_of_parties;
-  uint m = params.matrix_dimension.m;
   uint n = params.matrix_dimension.n;
   uint r = params.target_rank;
   uint s = params.first_challenge_size;
-  uint lambda = params.lambda;
   uint rounds = params.tau;
   uint matrix_count = params.solution_size + 1;
-  size_t seed_size = (size_t)ceil(lambda / 8.0);
 
   MatrixSize alpha_size = {1, matrix_count};
   MatrixSize A_size = {s, r};
   MatrixSize K_size = {r, n - r};
   MatrixSize C_size = {s, n - r};
 
-  data = malloc(sizeof(PartyData *) * rounds);
+  *data = malloc(sizeof(PartyData *) * rounds);
+  PartyData **data_value = *data;
 
   for (uint round = 0; round < rounds; round++) {
-    data[round] = malloc(sizeof(PartyData) * N);
-    for (uint party; party < N; party++) {
-      allocate_matrix(&data[round][party].alpha, GF_16, alpha_size);
-      allocate_matrix(&data[round][party].A, GF_16, A_size);
-      allocate_matrix(&data[round][party].C, GF_16, C_size);
-      allocate_matrix(&data[round][party].K, GF_16, K_size);
+    data_value[round] = malloc(sizeof(PartyData) * N);
+    for (uint party = 0; party < N; party++) {
+      allocate_matrix(&data_value[round][party].alpha, GF_16, alpha_size);
+      allocate_matrix(&data_value[round][party].A, GF_16, A_size);
+      allocate_matrix(&data_value[round][party].C, GF_16, C_size);
+      allocate_matrix(&data_value[round][party].K, GF_16, K_size);
     }
   }
 }
@@ -75,16 +77,17 @@ void allocate_challenges(Matrix **challenges, SignatureParameters params) {
 
 void allocate_all_parties(PartyState ***parties, SignatureParameters params) {
   uint N = params.number_of_parties;
-  uint m = params.matrix_dimension.m;
-  uint n = params.matrix_dimension.n;
   uint r = params.target_rank;
   uint s = params.first_challenge_size;
   uint rounds = params.tau;
 
   *parties = malloc(sizeof(PartyState *) * rounds);
+  PartyState **parties_value = *parties;
 
   for (uint round = 0; round < rounds; round++) {
-    init_parties(*parties[round], N, s, params.matrix_dimension, r);
+    printf("round %u\n", round);
+    parties_value[round] = malloc(sizeof(PartyState) * N);
+    init_parties(parties_value[round], N, s, params.matrix_dimension, r);
   }
 }
 
@@ -103,10 +106,10 @@ void allocate_party_seeds(uchar **party_seeds, uint number_of_parties,
   }
 }
 
-void initialize_sha3(EVP_MD_CTX *ctx, uint lambda) {
-  EVP_MD *sha3 = NULL;
-  ctx = EVP_MD_CTX_new();
-  if (ctx == NULL)
+void initialize_sha3(EVP_MD_CTX **ctx, uint lambda) {
+  *ctx = EVP_MD_CTX_new();
+  EVP_MD_CTX *ctx_value = *ctx;
+  if (ctx_value == NULL)
     goto err;
 
   /*
@@ -114,16 +117,12 @@ void initialize_sha3(EVP_MD_CTX *ctx, uint lambda) {
    * - first NULL param: use the "default" library context
    * - second NULL param: no particular criteria for the implementation
    */
-  sha3 = EVP_MD_fetch(NULL, "SHA3-256", NULL);
-  if (sha3 == NULL)
-    goto err;
-
   /* Initialise the digest operation */
-  if (!EVP_DigestInit_ex(ctx, sha3, NULL))
+  if (!EVP_DigestInit_ex(ctx_value, EVP_sha3_256(), NULL))
     goto err;
 
 err:
-  EVP_MD_free(sha3);
+  ERR_print_errors_fp(stderr);
 }
 
 /* applies SHA3 to `(salt, l, i, state)` */
@@ -131,29 +130,35 @@ int hash0(uchar *digest, EVP_MD_CTX *context, seed_t salt, uint lambda, uint l,
           uint i, seed_t state) {
   int ret = 1;
   // allocate `msg`
-  uint salt_size = lambda >> 2, int_size = 32, state_size = lambda >> 3;
-  uint total_size = salt_size + 2 * int_size + state_size;
+  uint int_size = 4;
+  uint total_size = salt.size + 2 * int_size + state.size;
   uchar *msg = malloc(sizeof(uchar) * total_size);
 
-  uint bit_index = 0;
-  msg[0] = (uchar)0;
   // pack `salt`
-  for (uint j = 0; j < 2 * lambda; j++) {
-    pack_boolean(msg, salt.data[j], &bit_index);
-  }
+  memcpy(msg, salt.data, salt.size);
   // pack `l, i`
-  pack_32bit_value(msg, l, &bit_index);
-  pack_32bit_value(msg, i, &bit_index);
+  msg[salt.size] = (uchar)((l >> 24) & 255);
+  msg[salt.size + 1] = (uchar)((l >> 16) & 255);
+  msg[salt.size + 2] = (uchar)((l >> 8) & 255);
+  msg[salt.size + 3] = (uchar)(l & 255);
+
+  msg[salt.size + 4] = (uchar)((i >> 24) & 255);
+  msg[salt.size + 5] = (uchar)((i >> 16) & 255);
+  msg[salt.size + 6] = (uchar)((i >> 8) & 255);
+  msg[salt.size + 7] = (uchar)(i & 255);
   // pack `state`
-  for (uint j = 0; j < lambda; j++) {
-    pack_boolean(msg, state.data[j], &bit_index);
-  }
+  memcpy(&msg[salt.size + 8], state.data, state.size);
+
   // pass the message to be digested
-  if (!EVP_DigestUpdate(context, msg, sizeof(msg)))
+  if (!EVP_DigestUpdate(context, msg, total_size))
     goto err;
 
   // calculate the digest
   if (!EVP_DigestFinal_ex(context, digest, NULL))
+    goto err;
+
+  // reinit the hash context
+  if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
     goto err;
 
   ret = 0;
@@ -172,9 +177,9 @@ int hash0_last(uchar *digest, EVP_MD_CTX *context, seed_t salt, uint lambda,
   int ret = 1;
 
   // compute various sizes to obtain the length of `msg`
-  uint salt_size = lambda >> 2;
-  uint seed_size = lambda >> 3;
-  uint int_size = 32;
+  uint salt_size = salt.size;
+  uint seed_size = seed.size;
+  uint int_size = 4;
 
   uint alpha_size = alpha.size.n;
   uint K_length = K.size.m * K.size.n;
@@ -182,23 +187,23 @@ int hash0_last(uchar *digest, EVP_MD_CTX *context, seed_t salt, uint lambda,
   uint total_matrices_length = alpha_size + K_length + C_length;
 
   uint total_size = salt_size + 2 * int_size + seed_size;
-  total_size += (total_matrices_length >> 1);
-  if ((total_matrices_length & 1) != 0) {
-    total_size += 1;
-  }
+  total_size += ceil(total_matrices_length / 2.0);
 
   // allocate `msg`
   uchar *msg = malloc(sizeof(uchar) * total_size);
   pack_last_state(msg, salt, lambda, l, i, alpha, K, C);
 
   // pass the message to be digested
-  if (!EVP_DigestUpdate(context, msg, sizeof(msg)))
+  if (!EVP_DigestUpdate(context, msg, total_size))
     goto err;
 
   // calculate the digest
   if (!EVP_DigestFinal_ex(context, digest, NULL))
     goto err;
 
+  // reinit the hash context
+  if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
+    goto err;
   ret = 0;
 
 err:
@@ -215,21 +220,20 @@ int hash1(uchar *digest, EVP_MD_CTX *context, uchar *message, uint message_size,
           uint number_of_parties, uchar ***commits) {
   int ret = 1;
   // `salt` has 2 * lambda booleans, packed into lambda / 4 `uchar`s
-  uint salt_size = lambda >> 2;
-  uchar *msg = malloc(sizeof(uchar) * salt_size);
+  uint salt_size = ceil(lambda / 4.0);
 
   // pass `message` to the context
-  if (!EVP_DigestUpdate(context, message, sizeof(message)))
+  if (!EVP_DigestUpdate(context, message, message_size))
+    goto err;
+  // reinit the hash context
+  if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
     goto err;
 
-  // pack `salt` into `msg`
-  uint bit_index = 0;
-  for (uint i = 0; i < message_size; i++) {
-    pack_boolean(msg, salt[i], &bit_index);
-  }
-
   // pass `msg` to the context
-  if (!EVP_DigestUpdate(context, msg, sizeof(msg)))
+  if (!EVP_DigestUpdate(context, salt, salt_size))
+    goto err;
+  // reinit the hash context
+  if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
     goto err;
 
   // pass `commit` to the context
@@ -237,14 +241,17 @@ int hash1(uchar *digest, EVP_MD_CTX *context, uchar *message, uint message_size,
     for (uint j = 0; j < number_of_parties; j++) {
       if (!EVP_DigestUpdate(context, commits[i][j], sizeof(commits[i][j])))
         goto err;
+      // reinit the hash context
+      if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
+        goto err;
     }
   }
 
-  if (!EVP_DigestFinal_ex(context, digest, NULL))
+  // reinit the hash context
+  if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
     goto err;
 
 err:
-  free(msg);
   if (ret != 0)
     ERR_print_errors_fp(stderr);
   return ret;
@@ -260,15 +267,10 @@ void phase_one(uchar ***commits, seed_t salt, PartyData **data,
                SignatureParameters params, MinRankInstance instance,
                MinRankSolution solution) {
   // unpack `params`
-  uint k = params.solution_size;
   uint N = params.number_of_parties;
-  uint m = params.matrix_dimension.m;
-  uint n = params.matrix_dimension.n;
   uint r = params.target_rank;
   uint s = params.first_challenge_size;
   uint lambda = params.lambda;
-  uint tau = params.tau;
-  uint matrix_count = params.solution_size + 1;
   size_t seed_size = (size_t)ceil(lambda / 8.0);
 
   seed_t round_seed, party_seed;
@@ -277,8 +279,7 @@ void phase_one(uchar ***commits, seed_t salt, PartyData **data,
 
   // initialize context for hashes (used in `commits`)
   EVP_MD_CTX *hash_context;
-  EVP_MD *sha3;
-  initialize_sha3(hash_context, lambda);
+  initialize_sha3(&hash_context, lambda);
 
   // create various matrices
   Matrix alpha_sum, A_sum, C, C_sum, K_sum;
@@ -371,8 +372,8 @@ void phase_two(Matrix *challenges, uchar *h1, uchar *message, uint message_size,
   salt_wrap.data = salt;
 
   // compute the hash
-  EVP_MD_CTX *context = NULL;
-  initialize_sha3(context, lambda);
+  EVP_MD_CTX *context;
+  initialize_sha3(&context, lambda);
 
   hash1(h1, context, message, message_size, salt, lambda, tau, tau, commits);
 
@@ -388,8 +389,9 @@ void phase_two(Matrix *challenges, uchar *h1, uchar *message, uint message_size,
   gmp_randclear(prg_state);
 }
 
-void phase_three(MinRankInstance instance, PartyState **parties,
-                 PartyData **data, SignatureParameters params) {
+void phase_three(Matrix *challenges, MinRankInstance instance,
+                 PartyState **parties, PartyData **data,
+                 SignatureParameters params) {
   uint N = params.number_of_parties;
   uint s = params.first_challenge_size;
   uint r = params.target_rank; // rank of the solution
@@ -397,21 +399,22 @@ void phase_three(MinRankInstance instance, PartyState **parties,
 
   MatrixSize size = params.matrix_dimension;
   uint n = size.n;
-  MatrixSize C_size = {s, n - r};
+  MatrixSize S_size = {s, r};
   Matrix S;
-  allocate_matrix(&S, GF_16, C_size);
+  allocate_matrix(&S, GF_16, S_size);
 
   for (uint round = 0; round < params.tau; round++) {
     for (uint party = 0; party < N; party++) {
       compute_local_m(&parties[round][party], instance,
                       data[round][party].alpha, matrix_count);
-      compute_local_s(&parties[party], data[round][parties].R,
-                      data[round][parties].A);
+      compute_local_s(&parties[round][party], challenges[round],
+                      data[round][party].A);
+      print_matrix(&parties[round][party].S);
     }
     compute_global_s(&S, parties[round], N);
     for (uint party = 0; party < N; party++) {
       compute_local_v(&parties[round][party], S, data[round][party].K,
-                      data[round][party].R, data[round][party].C);
+                      challenges[round], data[round][party].C);
     }
   }
 }
@@ -423,10 +426,10 @@ void phase_four() {
 void sign(uchar *digest, MinRankInstance instance, MinRankSolution solution,
           uchar *message, uint msg_size, SignatureParameters params) {
   uchar ***commits;
-  allocate_all_commits(commits, params);
+  allocate_all_commits(&commits, params);
 
   PartyData **data;
-  allocate_all_party_data(data, params);
+  allocate_all_party_data(&data, params);
 
   // generate salt
   seed_t salt;
@@ -443,7 +446,7 @@ void sign(uchar *digest, MinRankInstance instance, MinRankSolution solution,
   allocate_hash_digest(h1, params.lambda);
 
   phase_two(challenges, h1, message, msg_size, params, salt.data, commits);
-  phase_three(instance, parties, data, params);
+  phase_three(challenges, instance, parties, data, params);
   /* phase_four(message, salt, h1); */
 }
 

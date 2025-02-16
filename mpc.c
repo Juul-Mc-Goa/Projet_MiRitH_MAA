@@ -258,14 +258,18 @@ void compute_local_m(PartyState *state, MinRankInstance instance,
 /* Compute `S = R * M_right + A` */
 void compute_local_s(PartyState *state, Matrix R, Matrix local_A) {
   matrix_product(&state->S, R, state->M_right);
+  printf("computed product\n");
   matrix_sum(&state->S, state->S, local_A);
 }
 
 /* Just sum each local `S`. */
 void compute_global_s(Matrix *S, PartyState *parties, uint number_of_parties) {
   fill_matrix_with_zero(S);
+  printf("initialized global S\n");
   for (uint i = 0; i < number_of_parties; i++) {
+    printf("party %u\n", i);
     matrix_sum(S, *S, parties[i].S);
+    printf("updated S\n");
   }
 }
 

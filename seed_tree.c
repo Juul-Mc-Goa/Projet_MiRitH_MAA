@@ -96,7 +96,7 @@ void TreePRG(const seed_t *salt, const seed_t *seed, size_t lambda, size_t N,
   }
 
   // Extract the seeds for the parties
-  size_t j = (size_t)(1 << N_bitlength);
+  size_t j = (size_t)(1 << N_bitlength) - 1;
   for (size_t i = 0; i < N; i++) {
     memcpy(output_seeds[i], tree[j + i].data, seed_size);
   }

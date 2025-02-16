@@ -2,7 +2,9 @@
 #include "gmp.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void allocate_packed_last_state(uchar *result, uint lambda,
                                 MatrixSize alpha_size, MatrixSize K_size,
@@ -28,7 +30,8 @@ void pack_boolean(uchar *result, bool element, uint *bit_index) {
 }
 
 void pack_four_bit_value(uchar *result, uint element, uint *bit_index) {
-  uint current_index = *bit_index >> 3, current_offset = *bit_index & 7;
+  uint current_index = *bit_index >> 3;
+  uint current_offset = *bit_index & 7;
 
   if (current_offset == 0) {
     uint8_t new_value = ((uint8_t)element) << 4;
@@ -50,17 +53,22 @@ void pack_32bit_value(uchar *result, uint element, uint *bit_index) {
 
 void pack_last_state(uchar *result, seed_t salt, uint lambda, uint l, uint i,
                      Matrix alpha, Matrix K, Matrix C) {
-  uint bit_index = 0;
 
   // pack `salt`
-  result[0] = (uchar)0;
-  for (uint i = 0; i < 2 * lambda; i++) {
-    pack_boolean(result, salt.data[i], &bit_index);
-  }
+  memcpy(result, salt.data, salt.size);
 
   // pack `l, i`
-  pack_32bit_value(result, l, &bit_index);
-  pack_32bit_value(result, i, &bit_index);
+  result[salt.size] = (uchar)((l >> 24) & 255);
+  result[salt.size + 1] = (uchar)((l >> 16) & 255);
+  result[salt.size + 2] = (uchar)((l >> 8) & 255);
+  result[salt.size + 3] = (uchar)(l & 255);
+
+  result[salt.size + 4] = (uchar)((i >> 24) & 255);
+  result[salt.size + 5] = (uchar)((i >> 16) & 255);
+  result[salt.size + 6] = (uchar)((i >> 8) & 255);
+  result[salt.size + 7] = (uchar)(i & 255);
+
+  uint bit_index = (salt.size << 3) + 64;
 
   // pack `alpha`
   for (uint i = 0; i < alpha.size.n; i++) {
@@ -68,13 +76,13 @@ void pack_last_state(uchar *result, seed_t salt, uint lambda, uint l, uint i,
   }
   // pack `K`
   for (uint i = 0; i < K.size.m; i++) {
-    for (uint j = 0; i < K.size.n; j++) {
+    for (uint j = 0; j < K.size.n; j++) {
       pack_four_bit_value(result, K.data[i][j], &bit_index);
     }
   }
   // pack `C`
   for (uint i = 0; i < C.size.m; i++) {
-    for (uint j = 0; i < C.size.n; j++) {
+    for (uint j = 0; j < C.size.n; j++) {
       pack_four_bit_value(result, C.data[i][j], &bit_index);
     }
   }

@@ -88,7 +88,6 @@ typedef struct PartyState {
 typedef struct PartyData {
   Matrix alpha;
   Matrix A;
-  Matrix R;
   Matrix C;
   Matrix K;
 } PartyData;

@@ -1,18 +1,15 @@
 #include "constants.h"
-#include "field_arithmetics.h"
 #include "key_generation.h"
-#include "matrix.h"
 #include "mpc.h"
 #include "packing.h"
 #include "random.h"
 #include "sign.h"
 #include "types.h"
 
-#include <math.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
-#include <stdint.h>
+#include <stdio.h>
 
 int main(int argc, char **argv) {
   SignatureParameters params;
@@ -26,11 +23,10 @@ int main(int argc, char **argv) {
   params.number_of_parties = 2;
   params.tau = 2;
 
-  uint seed_size = (uint)ceil(params.lambda / 8.0);
-
-  uchar ***commits = malloc(sizeof(uchar **) * params.tau);
-  allocate_all_commits(commits, params.lambda, params.tau,
-                       params.number_of_parties);
+  uchar *message = (uchar *)"hello";
+  uint msg_size = 5;
+  uchar ***commits;
+  allocate_all_commits(&commits, params);
 
   // generate the keys
   PublicPrivateKeyPair key_pair;
@@ -51,5 +47,29 @@ int main(int argc, char **argv) {
   unpack_solution_from_private_key(&solution, prg_state, params,
                                    key_pair.private_key);
 
-  // TODO: Apply phase_one, phase_two, phase_three, phase_four
+  PartyData **data;
+  allocate_all_party_data(&data, params);
+
+  // generate salt
+  seed_t salt;
+  allocate_seed(&salt, 2 * params.lambda);
+  generate_seed(salt);
+
+  phase_one(commits, salt, data, params, instance, solution);
+
+  Matrix *challenges;
+  allocate_challenges(&challenges, params);
+
+  PartyState **parties;
+  allocate_all_parties(&parties, params);
+  uchar *h1;
+  allocate_hash_digest(h1, params.lambda);
+
+  printf("allocated challenges, h1, parties\n");
+
+  phase_two(challenges, h1, message, msg_size, params, salt.data, commits);
+  printf("completed phase two\n");
+  phase_three(challenges, instance, parties, data, params);
+  printf("completed phase three\n");
+  // TODO: Apply phase_two, phase_three, phase_four
 }
