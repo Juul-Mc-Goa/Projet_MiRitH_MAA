@@ -8,6 +8,7 @@
 #include <openssl/evp.h>
 
 void allocate_commit(uchar *commit, uint lambda);
+void allocate_all_commits(uchar ***commits, uint lambda, uint rounds, uint N);
 void allocate_hash_digest(uchar *digest, uint lambda);
 void allocate_party_seeds(uchar **party_seeds, uint number_of_parties,
                           uint lambda);
@@ -21,6 +22,6 @@ int hash1(uchar *digest, EVP_MD_CTX *context, uchar *message, uint message_size,
           uchar *salt, uint lambda, uint number_of_rounds,
           uint number_of_parties, uchar ***commits);
 
-int phase_one(uchar ***commits, seed_t *seeds,SignatureParameters params,
-              MinRankInstance instance, MinRankSolution solution);
+void phase_one(uchar ***commits, PartyData **data, SignatureParameters params, MinRankInstance instance,
+               MinRankSolution solution);
 #endif // SIGN_H_

@@ -2,6 +2,7 @@
 #include "field_arithmetics.h"
 #include "key_generation.h"
 #include "matrix.h"
+#include "mpc.h"
 #include "packing.h"
 #include "random.h"
 #include "sign.h"
@@ -28,12 +29,8 @@ int main(int argc, char **argv) {
   uint seed_size = (uint)ceil(params.lambda / 8.0);
 
   uchar ***commits = malloc(sizeof(uchar **) * params.tau);
-  for (uint round = 0; round < params.tau; round++) {
-    commits[round] = malloc(sizeof(uchar *) * params.number_of_parties);
-    for (uint party = 0; party < params.number_of_parties - 1; party++) {
-      commits[round][party] = malloc(sizeof(uchar) * seed_size);
-    }
-  }
+  allocate_all_commits(commits, params.lambda, params.tau,
+                       params.number_of_parties);
 
   // generate the keys
   PublicPrivateKeyPair key_pair;
@@ -42,13 +39,15 @@ int main(int argc, char **argv) {
 
   gmp_randstate_t prg_state;
   gmp_randinit_default(prg_state);
-  MinRankInstance instance;
-  generate_random_instance(&instance, params.solution_size, prg_state, GF_16);
 
+  MinRankInstance instance;
+  init_instance(&instance, params.solution_size + 1, params.matrix_dimension);
   unpack_instance_from_public_key(&instance, prg_state, params,
                                   key_pair.public_key);
 
   MinRankSolution solution;
+  init_solution(&solution, params.solution_size + 1, params.target_rank,
+                params.matrix_dimension);
   unpack_solution_from_private_key(&solution, prg_state, params,
                                    key_pair.private_key);
 

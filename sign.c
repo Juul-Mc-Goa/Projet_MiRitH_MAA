@@ -12,10 +12,80 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
-#include <stdint.h>
 
 void allocate_commit(uchar *commit, uint lambda) {
-  commit = malloc(sizeof(uchar) * lambda);
+  commit = malloc(sizeof(uchar) * (uint)ceil(lambda / 8.0));
+}
+
+void allocate_all_commits(uchar ***commits, SignatureParameters params) {
+  uint lambda = params.lambda;
+  uint rounds = params.tau;
+  uint N = params.number_of_parties;
+
+  commits = malloc(sizeof(uchar **) * rounds);
+  for (uint round = 0; round < rounds; round++) {
+    commits[round] = malloc(sizeof(uchar *) * N);
+    for (uint party; party < N; party++) {
+      allocate_commit(commits[round][party], lambda);
+    }
+  }
+}
+
+void allocate_all_party_data(PartyData **data, SignatureParameters params) {
+  uint N = params.number_of_parties;
+  uint m = params.matrix_dimension.m;
+  uint n = params.matrix_dimension.n;
+  uint r = params.target_rank;
+  uint s = params.first_challenge_size;
+  uint lambda = params.lambda;
+  uint rounds = params.tau;
+  uint matrix_count = params.solution_size + 1;
+  size_t seed_size = (size_t)ceil(lambda / 8.0);
+
+  MatrixSize alpha_size = {1, matrix_count};
+  MatrixSize A_size = {s, r};
+  MatrixSize K_size = {r, n - r};
+  MatrixSize C_size = {s, n - r};
+
+  data = malloc(sizeof(PartyData *) * rounds);
+
+  for (uint round = 0; round < rounds; round++) {
+    data[round] = malloc(sizeof(PartyData) * N);
+    for (uint party; party < N; party++) {
+      allocate_matrix(&data[round][party].alpha, GF_16, alpha_size);
+      allocate_matrix(&data[round][party].A, GF_16, A_size);
+      allocate_matrix(&data[round][party].C, GF_16, C_size);
+      allocate_matrix(&data[round][party].K, GF_16, K_size);
+    }
+  }
+}
+
+void allocate_challenges(Matrix **challenges, SignatureParameters params) {
+  uint s = params.first_challenge_size;
+  uint m = params.matrix_dimension.m;
+  uint rounds = params.tau;
+  MatrixSize R_size = {s, m};
+
+  *challenges = malloc(sizeof(Matrix) * rounds);
+
+  for (uint round = 0; round < rounds; round++) {
+    allocate_matrix(&(*challenges)[round], GF_16, R_size);
+  }
+}
+
+void allocate_all_parties(PartyState ***parties, SignatureParameters params) {
+  uint N = params.number_of_parties;
+  uint m = params.matrix_dimension.m;
+  uint n = params.matrix_dimension.n;
+  uint r = params.target_rank;
+  uint s = params.first_challenge_size;
+  uint rounds = params.tau;
+
+  *parties = malloc(sizeof(PartyState *) * rounds);
+
+  for (uint round = 0; round < rounds; round++) {
+    init_parties(*parties[round], N, s, params.matrix_dimension, r);
+  }
 }
 
 void allocate_hash_digest(uchar *digest, uint lambda) {
@@ -180,10 +250,14 @@ err:
   return ret;
 }
 
+void hash2(uchar *msg, uint msg_size) {
+  // TODO
+}
+
 /* Phase one: generate `params.tau` instances of the MPC protocol. The
  * result is stored in `commits`: a 2D array of SHA3 digests. */
-void phase_one(uchar ***commits, PartyData **data, Matrix alpha, Matrix A,
-               Matrix K, SignatureParameters params, MinRankInstance instance,
+void phase_one(uchar ***commits, seed_t salt, PartyData **data,
+               SignatureParameters params, MinRankInstance instance,
                MinRankSolution solution) {
   // unpack `params`
   uint k = params.solution_size;
@@ -197,11 +271,6 @@ void phase_one(uchar ***commits, PartyData **data, Matrix alpha, Matrix A,
   uint matrix_count = params.solution_size + 1;
   size_t seed_size = (size_t)ceil(lambda / 8.0);
 
-  // generate salt
-  seed_t salt;
-  allocate_seed(&salt, 2 * lambda);
-  generate_seed(salt);
-
   seed_t round_seed, party_seed;
   allocate_seed(&round_seed, lambda);
   allocate_seed(&party_seed, lambda);
@@ -214,12 +283,15 @@ void phase_one(uchar ***commits, PartyData **data, Matrix alpha, Matrix A,
   // create various matrices
   Matrix alpha_sum, A_sum, C, C_sum, K_sum;
   MatrixSize A_size = {s, r};
-  MatrixSize alpha_size = {1, k + 1};
   MatrixSize C_size = {s, r};
-  MatrixSize K_size = {r, n - r};
+
+  Matrix alpha = solution.alpha;
+  Matrix K = solution.K;
+  Matrix A;
+  allocate_matrix(&A, GF_16, A_size);
 
   allocate_matrix(&alpha_sum, GF_16, alpha.size);
-  allocate_matrix(&A_sum, GF_16, A.size);
+  allocate_matrix(&A_sum, GF_16, A_size);
   allocate_matrix(&K_sum, GF_16, K.size);
   allocate_matrix(&C, GF_16, C_size);
   allocate_matrix(&C_sum, GF_16, C_size);
@@ -287,7 +359,7 @@ void phase_one(uchar ***commits, PartyData **data, Matrix alpha, Matrix A,
 
 /* Compute a hash of `message || salt || commits`, then use it to create
  * the challenges for each round. */
-void phase_two(Matrix *challenges, uchar *message, uint message_size,
+void phase_two(Matrix *challenges, uchar *h1, uchar *message, uint message_size,
                SignatureParameters params, uchar *salt, uchar ***commits) {
   uint lambda = params.lambda;
   uint tau = params.tau;
@@ -300,8 +372,6 @@ void phase_two(Matrix *challenges, uchar *message, uint message_size,
   EVP_MD_CTX *context = NULL;
   initialize_sha3(context, lambda);
 
-  uchar *h1;
-  allocate_hash_digest(h1, lambda);
   hash1(h1, context, message, message_size, salt, lambda, tau, tau, commits);
 
   gmp_randstate_t prg_state;
@@ -316,8 +386,8 @@ void phase_two(Matrix *challenges, uchar *message, uint message_size,
   gmp_randclear(prg_state);
 }
 
-void phase_three(MinRankInstance instance, PartyData **data,
-                 SignatureParameters params) {
+void phase_three(MinRankInstance instance, PartyState **parties,
+                 PartyData **data, SignatureParameters params) {
   uint N = params.number_of_parties;
   uint s = params.first_challenge_size;
   uint r = params.target_rank; // rank of the solution
@@ -329,22 +399,48 @@ void phase_three(MinRankInstance instance, PartyData **data,
   Matrix S;
   allocate_matrix(&S, GF_16, C_size);
 
-  PartyState *parties;
-  init_parties(parties, N, s, size, r);
-
   for (uint round = 0; round < params.tau; round++) {
     for (uint party = 0; party < N; party++) {
-      compute_local_m(&parties[party], instance, data[round][party].alpha,
-                      matrix_count);
+      compute_local_m(&parties[round][party], instance,
+                      data[round][party].alpha, matrix_count);
       compute_local_s(&parties[party], data[round][parties].R,
                       data[round][parties].A);
     }
-    compute_global_s(&S, parties, N);
+    compute_global_s(&S, parties[round], N);
     for (uint party = 0; party < N; party++) {
-      compute_local_v(&parties[party], S, data[round][party].K,
+      compute_local_v(&parties[round][party], S, data[round][party].K,
                       data[round][party].R, data[round][party].C);
     }
   }
+}
+
+void phase_four() {}
+
+void sign(uchar *digest, MinRankInstance instance, MinRankSolution solution,
+          uchar *message, uint msg_size, SignatureParameters params) {
+  uchar ***commits;
+  allocate_all_commits(commits, params);
+
+  PartyData **data;
+  allocate_all_party_data(data, params);
+
+  // generate salt
+  seed_t salt;
+  allocate_seed(&salt, 2 * params.lambda);
+  generate_seed(salt);
+
+  phase_one(commits, salt, data, params, instance, solution);
+
+  Matrix *challenges;
+  allocate_challenges(&challenges, params);
+  PartyState **parties;
+  allocate_all_parties(&parties, params);
+  uchar *h1;
+  allocate_hash_digest(h1, params.lambda);
+
+  phase_two(challenges, h1, message, msg_size, params, salt.data, commits);
+  phase_three(instance, parties, data, params);
+  /* phase_four(message, salt, h1); */
 }
 
 /* Phase 3 of signing

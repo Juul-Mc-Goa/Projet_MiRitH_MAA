@@ -102,7 +102,6 @@ void key_gen(PublicPrivateKeyPair *result, SignatureParameters params) {
 
   // 2.3.4 compute M_0 = E - sum: here field_size is a power of two, so -1 = 1,
   // and M_0 = E + sum
-  matrix_opposite(&sum);
   matrix_sum(&result->public_key.m0, E, sum);
 
   free(E_R.data);
