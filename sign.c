@@ -416,7 +416,9 @@ void phase_three(MinRankInstance instance, PartyState **parties,
   }
 }
 
-void phase_four() {}
+void phase_four() {
+  // TODO :(
+}
 
 void sign(uchar *digest, MinRankInstance instance, MinRankSolution solution,
           uchar *message, uint msg_size, SignatureParameters params) {
