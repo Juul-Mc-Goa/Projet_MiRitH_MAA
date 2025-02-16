@@ -287,8 +287,6 @@ void phase_one(uchar ***commits, seed_t salt, PartyData **data,
 
   Matrix alpha = solution.alpha;
   Matrix K = solution.K;
-  Matrix A;
-  allocate_matrix(&A, GF_16, A_size);
 
   allocate_matrix(&alpha_sum, GF_16, alpha.size);
   allocate_matrix(&A_sum, GF_16, A_size);
@@ -298,6 +296,10 @@ void phase_one(uchar ***commits, seed_t salt, PartyData **data,
 
   gmp_randstate_t prg_state;
   gmp_randinit_default(prg_state);
+
+  Matrix A;
+  allocate_matrix(&A, GF_16, A_size);
+  generate_random_matrix(&A, prg_state, GF_16);
 
   uchar **party_seeds = malloc(sizeof(uchar *) * N);
   for (uint i = 0; i < N; i++) {
