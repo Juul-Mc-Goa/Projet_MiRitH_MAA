@@ -1,4 +1,3 @@
-#include "constants.h"
 #include "random.h"
 #include "types.h"
 

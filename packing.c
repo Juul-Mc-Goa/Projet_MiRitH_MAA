@@ -51,6 +51,14 @@ void pack_32bit_value(uchar *result, uint element, uint *bit_index) {
   }
 }
 
+void pack_matrix(uchar *result, Matrix M, uint *bit_index) {
+  for (uint i = 0; i < M.size.m; i++) {
+    for (uint j = 0; j < M.size.n; j++) {
+      pack_four_bit_value(result, M.data[i][j], bit_index);
+    }
+  }
+}
+
 void pack_last_state(uchar *result, seed_t salt, uint lambda, uint l, uint i,
                      Matrix alpha, Matrix K, Matrix C) {
 
@@ -71,19 +79,20 @@ void pack_last_state(uchar *result, seed_t salt, uint lambda, uint l, uint i,
   uint bit_index = (salt.size << 3) + 64;
 
   // pack `alpha`
-  for (uint i = 0; i < alpha.size.n; i++) {
-    pack_four_bit_value(result, alpha.data[0][i], &bit_index);
-  }
+  pack_matrix(result, alpha, &bit_index);
   // pack `K`
-  for (uint i = 0; i < K.size.m; i++) {
-    for (uint j = 0; j < K.size.n; j++) {
-      pack_four_bit_value(result, K.data[i][j], &bit_index);
-    }
-  }
+  pack_matrix(result, K, &bit_index);
   // pack `C`
-  for (uint i = 0; i < C.size.m; i++) {
-    for (uint j = 0; j < C.size.n; j++) {
-      pack_four_bit_value(result, C.data[i][j], &bit_index);
+  pack_matrix(result, C, &bit_index);
+}
+
+void pack_all_S_and_V(uchar *result, PartyState **parties, uint tau, uint N) {
+  uint bit_index = 0;
+  for (uint round = 0; round < tau; round++) {
+    for (uint party = 0; party < N; party++) {
+      // pack S
+      pack_matrix(result, parties[round][party].S, &bit_index);
+      pack_matrix(result, parties[round][party].V, &bit_index);
     }
   }
 }
