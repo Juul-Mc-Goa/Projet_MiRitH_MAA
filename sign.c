@@ -485,9 +485,6 @@ void phase_one(uchar ***commits, uchar ***party_seeds, seed_t salt,
     party_seed.data = party_seeds[round][N - 1];
     PRG_init(&salt, &party_seed, lambda, &prg_state);
     generate_random_matrix(&data[round][N - 1].A, prg_state, GF_16);
-    generate_random_matrix(&data[round][N - 1].alpha, prg_state, GF_16);
-    generate_random_matrix(&data[round][N - 1].C, prg_state, GF_16);
-    generate_random_matrix(&data[round][N - 1].K, prg_state, GF_16);
     // compute last alpha, K, C
     matrix_sum(&data[round][N - 1].alpha, solution.alpha, alpha_sum);
     matrix_sum(&data[round][N - 1].K, solution.K, K_sum);
