@@ -14,6 +14,7 @@ void pack_matrix(uchar *result, Matrix M, uint *bit_index);
 void pack_all_S_and_V(uchar *result, PartyState **parties, uint tau, uint N) ;
 void pack_last_state(uchar *result, seed_t salt, uint lambda, uint l, uint i,
                      Matrix alpha, Matrix K, Matrix C);
+void pack_all_S_and_V(uchar *result, PartyState **parties, uint tau, uint N);
 void unpack_solution_from_private_key(MinRankSolution *solution,
                                       gmp_randstate_t prg_state,
                                       SignatureParameters params,
