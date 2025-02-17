@@ -516,7 +516,7 @@ void prg_first_challenge(Matrix *challenges, uchar *h1,
   seed_t h1_wrap = {commit_size(lambda), h1};
 
   // create the challenges
-    PRG_init(&h1_wrap, NULL, lambda, &prg_state);
+  PRG_init(&h1_wrap, NULL, lambda, &prg_state);
   for (uint round = 0; round < tau; round++) {
     generate_random_matrix(&challenges[round], prg_state, GF_16);
   }
@@ -575,6 +575,7 @@ void prg_second_challenge(uint *challenges, uchar *h2,
                           SignatureParameters params) {
   uint lambda = params.lambda;
   uint tau = params.tau;
+  uint N = params.number_of_parties;
 
   gmp_randstate_t prg_state;
   gmp_randinit_default(prg_state);
@@ -587,10 +588,10 @@ void prg_second_challenge(uint *challenges, uchar *h2,
   PRG_bytes(prg_state, 4 * tau, random_bytes);
 
   for (uint round = 0; round < tau; round++) {
-    challenges[round] = ((uint)random_bytes[4 * round] << 24);
-    challenges[round] += ((uint)random_bytes[4 * round + 1] << 16);
-    challenges[round] += ((uint)random_bytes[4 * round + 2] << 8);
-    challenges[round] += (uint)random_bytes[4 * round + 3];
+    challenges[round] = ((uint)random_bytes[4 * round] << 24) % N;
+    challenges[round] += ((uint)random_bytes[4 * round + 1] << 16) % N;
+    challenges[round] += ((uint)random_bytes[4 * round + 2] << 8) % N;
+    challenges[round] += (uint)random_bytes[4 * round + 3] % N;
   }
 
   gmp_randclear(prg_state);
