@@ -509,6 +509,25 @@ void phase_one(uchar ***commits, uchar ***party_seeds, seed_t salt,
   gmp_randclear(prg_state);
 }
 
+void prg_first_challenges(Matrix *challenges, uchar *h1,
+                      SignatureParameters params) {
+  uint lambda = params.lambda;
+  uint tau = params.tau;
+
+  gmp_randstate_t prg_state;
+  gmp_randinit_default(prg_state);
+
+  seed_t h1_wrap = {commit_size(lambda), h1};
+
+  // create the challenges
+  for (uint round = 0; round < tau; round++) {
+    PRG_init(&h1_wrap, NULL, lambda, &prg_state);
+    generate_random_matrix(&challenges[round], prg_state, GF_16);
+  }
+
+  gmp_randclear(prg_state);
+}
+
 /* Compute a hash of `message || salt || commits`, then use it to create
  * the challenges for each round. */
 void phase_two(Matrix *challenges, uchar *h1, uchar *message, uint message_size,
@@ -525,17 +544,8 @@ void phase_two(Matrix *challenges, uchar *h1, uchar *message, uint message_size,
   initialize_sha3(&context, lambda);
 
   hash1(h1, context, message, message_size, salt, lambda, tau, tau, commits);
+  prg_first_challenges(challenges, h1, params);
 
-  gmp_randstate_t prg_state;
-  gmp_randinit_default(prg_state);
-
-  // create the challenges
-  for (uint round = 0; round < tau; round++) {
-    PRG_init(&salt_wrap, NULL, lambda, &prg_state);
-    generate_random_matrix(&challenges[round], prg_state, GF_16);
-  }
-
-  gmp_randclear(prg_state);
   EVP_MD_CTX_free(context);
 }
 
@@ -570,6 +580,31 @@ void phase_three(Matrix *challenges, MinRankInstance instance,
   clear_matrix(&S);
 }
 
+void prg_second_challenges(uint *challenges, uchar *h2,
+                           SignatureParameters params) {
+  uint lambda = params.lambda;
+  uint tau = params.tau;
+
+  gmp_randstate_t prg_state;
+  gmp_randinit_default(prg_state);
+
+  seed_t h2_wrap = {commit_size(lambda), h2};
+
+  PRG_init(&h2_wrap, NULL, lambda, &prg_state);
+
+  uchar *random_bytes = malloc(sizeof(uchar) * 4 * tau);
+  PRG_bytes(prg_state, 4 * tau, random_bytes);
+
+  for (uint round = 0; round < tau; round++) {
+    challenges[round] = ((uint)random_bytes[4 * round] << 24);
+    challenges[round] += ((uint)random_bytes[4 * round + 1] << 16);
+    challenges[round] += ((uint)random_bytes[4 * round + 2] << 8);
+    challenges[round] += (uint)random_bytes[4 * round + 3];
+  }
+
+  gmp_randclear(prg_state);
+}
+
 void phase_four(uchar *h2, uint *second_challenges, uchar *message,
                 uint message_size, seed_t salt, uchar *h1, PartyState **parties,
                 SignatureParameters params) {
@@ -582,22 +617,8 @@ void phase_four(uchar *h2, uint *second_challenges, uchar *message,
   hash2(h2, message, message_size, salt, h1, parties, context, params);
 
   // generate challenges
-  gmp_randstate_t prg_state;
-  gmp_randinit_default(prg_state);
-  seed_t h2_wrap = {commit_size(lambda), h2};
-  PRG_init(&h2_wrap, NULL, lambda, &prg_state);
+  prg_second_challenges(second_challenges, h2, params);
 
-  uchar *random_bytes = malloc(sizeof(uchar) * 4 * tau);
-  PRG_bytes(prg_state, 4 * tau, random_bytes);
-
-  for (uint round = 0; round < tau; round++) {
-    second_challenges[round] = ((uint)random_bytes[4 * round] << 24);
-    second_challenges[round] += ((uint)random_bytes[4 * round + 1] << 16);
-    second_challenges[round] += ((uint)random_bytes[4 * round + 2] << 8);
-    second_challenges[round] += (uint)random_bytes[4 * round + 3];
-  }
-
-  gmp_randclear(prg_state);
   EVP_MD_CTX_free(context);
 }
 
@@ -693,7 +714,6 @@ uint sign(uchar **digest, uchar *message, uint msg_size,
   allocate_challenges(&challenges, params);
   PartyState **parties;
   allocate_all_parties(&parties, params);
-
   uchar *h1;
   allocate_commit(&h1, params.lambda);
 
@@ -714,6 +734,7 @@ uint sign(uchar **digest, uchar *message, uint msg_size,
   // phase five
   uint digest_size =
       allocate_signature_digest(digest, second_challenges, params);
+
   phase_five(*digest, digest_size, second_challenges, salt, h1, h2, commits,
              party_seeds, parties, data, params);
 

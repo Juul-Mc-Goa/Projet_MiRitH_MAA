@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
   uint digest_size1 = sign(&digest1, message, msg_size, key_pair, params);
   print_digest(digest1, digest_size1);
 
-  printf("test\n");
+  // well, the signature is not deterministic...
   uint digest_size2 = sign(&digest2, message, msg_size, key_pair, params);
   print_digest(digest2, digest_size2);
 }
