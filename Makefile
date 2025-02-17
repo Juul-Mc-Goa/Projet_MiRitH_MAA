@@ -4,7 +4,7 @@
 # @file
 # @version 0.1
 
-.PHONY: clean
+.PHONY: test run clean
 
 test_dir := tests
 all_tests := $(wildcard $(test_dir)/*.c)
@@ -33,6 +33,8 @@ $(objects): %.o: %.c
 	gcc -c -Wall $^
 
 # Other
+run: prog
+	./prog
 test:
 	cd $(test_dir) && $(MAKE)
 
