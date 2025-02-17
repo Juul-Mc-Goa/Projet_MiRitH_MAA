@@ -516,8 +516,8 @@ void prg_first_challenge(Matrix *challenges, uchar *h1,
   seed_t h1_wrap = {commit_size(lambda), h1};
 
   // create the challenges
-  for (uint round = 0; round < tau; round++) {
     PRG_init(&h1_wrap, NULL, lambda, &prg_state);
+  for (uint round = 0; round < tau; round++) {
     generate_random_matrix(&challenges[round], prg_state, GF_16);
   }
 
