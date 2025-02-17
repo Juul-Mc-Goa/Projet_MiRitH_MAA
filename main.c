@@ -11,6 +11,13 @@
 #include <openssl/evp.h>
 #include <stdio.h>
 
+void print_digest(uchar *digest, uint digest_size) {
+  printf("digest size: %u\ndigest:\n", digest_size);
+  for (uint i = 0; i < digest_size; i++) {
+    printf("%02x", (uint)digest[i]);
+  }
+  printf("\n");
+}
 int main(int argc, char **argv) {
   SignatureParameters params;
   params.lambda = 4;
@@ -25,60 +32,17 @@ int main(int argc, char **argv) {
 
   uchar *message = (uchar *)"hello";
   uint msg_size = 5;
-  uchar ***commits;
-  allocate_all_commits(&commits, params);
 
   // generate the keys
   PublicPrivateKeyPair key_pair;
   allocate_key_pair(&key_pair, params);
   key_gen(&key_pair, params);
 
-  gmp_randstate_t prg_state;
-  gmp_randinit_default(prg_state);
+  uchar *digest1, *digest2;
+  uint digest_size1 = sign(&digest1, message, msg_size, key_pair, params);
+  print_digest(digest1, digest_size1);
 
-  MinRankInstance instance;
-  init_instance(&instance, params.solution_size + 1, params.matrix_dimension);
-  unpack_instance_from_public_key(&instance, prg_state, params,
-                                  key_pair.public_key);
-
-  MinRankSolution solution;
-  init_solution(&solution, params.solution_size + 1, params.target_rank,
-                params.matrix_dimension);
-  unpack_solution_from_private_key(&solution, prg_state, params,
-                                   key_pair.private_key);
-
-  PartyData **data;
-  allocate_all_party_data(&data, params);
-
-  // generate salt
-  seed_t salt;
-  allocate_seed(&salt, 2 * params.lambda);
-  generate_seed(salt);
-  uchar ***party_seeds;
-  allocate_all_party_seeds(&party_seeds, params);
-
-  phase_one(commits, party_seeds, salt, data, params, instance, solution);
-  printf("completed phase one\n");
-
-  Matrix *challenges;
-  allocate_challenges(&challenges, params);
-
-  PartyState **parties;
-  allocate_all_parties(&parties, params);
-  uchar *h1;
-  allocate_commit(&h1, params.lambda);
-
-
-  phase_two(challenges, h1, message, msg_size, params, salt.data, commits);
-  printf("completed phase two\n");
-  phase_three(challenges, instance, parties, data, params);
-  printf("completed phase three\n");
-
-  uchar *h2;
-  allocate_commit(&h2, params.lambda);
-  uint *second_challenges;
-  allocate_second_challenges(&second_challenges, params);
-  phase_four(h2, second_challenges, message, msg_size, salt, h1, parties,
-             params);
-  printf("completed phase four\n");
+  printf("test\n");
+  uint digest_size2 = sign(&digest2, message, msg_size, key_pair, params);
+  print_digest(digest2, digest_size2);
 }
