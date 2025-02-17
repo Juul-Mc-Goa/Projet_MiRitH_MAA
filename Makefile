@@ -21,7 +21,8 @@ export key_gen_flags := -lgmp
 export mpc_flags := -lgmp
 export all_flags := -lgmp -lcrypto -lm
 
-objects := main.o sign.o key_generation.o random.o matrix.o field_arithmetics.o constants.o mpc.o seed_tree.o packing.o
+objects := main.o sign.o verif.o key_generation.o random.o matrix.o \
+field_arithmetics.o constants.o mpc.o seed_tree.o packing.o
 
 # Linked binary
 prog: $(objects)

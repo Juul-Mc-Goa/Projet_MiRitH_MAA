@@ -7,6 +7,7 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 
+uint commit_size(uint lambda);
 void allocate_commit(uchar **commit, uint lambda);
 void allocate_all_commits(uchar ****commits, SignatureParameters params);
 void allocate_all_party_seeds(uchar ****party_seeds,
@@ -16,10 +17,11 @@ void allocate_party_seeds(uchar **party_seeds, uint number_of_parties,
                           uint lambda);
 uint allocate_signature_digest(uchar **digest, uint *second_challenges,
                                SignatureParameters params);
-void allocate_challenges(Matrix **challenges, SignatureParameters params);
-void allocate_second_challenges(uint **challenges, SignatureParameters params);
+void allocate_first_challenge(Matrix **challenges, SignatureParameters params);
+void allocate_second_challenge(uint **challenges, SignatureParameters params);
 void allocate_all_parties(PartyState ***parties, SignatureParameters params);
 void initialize_sha3(EVP_MD_CTX **ctx, uint lambda);
+
 int hash0(uchar *digest, EVP_MD_CTX *context, seed_t salt, uint lambda, uint l,
           uint i, seed_t state);
 int hash0_last(uchar *digest, EVP_MD_CTX *context, seed_t salt, uint lambda,
@@ -27,6 +29,11 @@ int hash0_last(uchar *digest, EVP_MD_CTX *context, seed_t salt, uint lambda,
 int hash1(uchar *digest, EVP_MD_CTX *context, uchar *message, uint message_size,
           uchar *salt, uint lambda, uint number_of_rounds,
           uint number_of_parties, uchar ***commits);
+
+void prg_first_challenge(Matrix *challenges, uchar *h1,
+                         SignatureParameters params) ;
+void prg_second_challenge(uint *challenges, uchar *h2,
+                          SignatureParameters params);
 
 void phase_one(uchar ***commits, uchar ***party_seeds, seed_t salt,
                PartyData **data, SignatureParameters params,

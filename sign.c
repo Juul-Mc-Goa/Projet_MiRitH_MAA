@@ -41,7 +41,6 @@ void allocate_all_commits(uchar ****commits, SignatureParameters params) {
 }
 
 void clear_all_commits(uchar ***commits, SignatureParameters params) {
-  uint lambda = params.lambda;
   uint rounds = params.tau;
   uint N = params.number_of_parties;
 
@@ -130,7 +129,7 @@ void clear_all_party_data(PartyData **data, SignatureParameters params) {
   }
 }
 
-void allocate_challenges(Matrix **challenges, SignatureParameters params) {
+void allocate_first_challenge(Matrix **challenges, SignatureParameters params) {
   uint s = params.first_challenge_size;
   uint m = params.matrix_dimension.m;
   uint rounds = params.tau;
@@ -143,14 +142,14 @@ void allocate_challenges(Matrix **challenges, SignatureParameters params) {
   }
 }
 
-void clear_challenges(Matrix *challenges, SignatureParameters params) {
+void clear_first_challenge(Matrix *challenges, SignatureParameters params) {
   uint rounds = params.tau;
   for (uint round = 0; round < rounds; round++) {
     clear_matrix(&challenges[round]);
   }
 }
 
-void allocate_second_challenges(uint **challenges, SignatureParameters params) {
+void allocate_second_challenge(uint **challenges, SignatureParameters params) {
   *challenges = malloc(sizeof(uint) * params.tau);
 }
 
@@ -171,8 +170,6 @@ void allocate_all_parties(PartyState ***parties, SignatureParameters params) {
 
 void clear_all_parties(PartyState **parties, SignatureParameters params) {
   uint N = params.number_of_parties;
-  uint r = params.target_rank;
-  uint s = params.first_challenge_size;
   uint rounds = params.tau;
 
   for (uint round = 0; round < rounds; round++) {
@@ -210,11 +207,12 @@ uint allocate_signature_digest(uchar **digest, uint *second_challenges,
 
   uint total_size = salt_size + 2 * hash_size;
 
-  for (uint i = 0; i < tau; i++) {
+  for (uint round = 0; round < tau; round++) {
     // party states
     total_size += (N - 1) * seed_size;
     // last party has a different state
-    if (second_challenges[i] != N)
+    uint i_star = second_challenges[round] % N;
+    if (i_star != N)
       total_size += (uint)ceil((alpha_length + K_length + C_length) / 2.0);
 
     // commit for i_star
@@ -363,6 +361,8 @@ int hash1(uchar *digest, EVP_MD_CTX *context, uchar *message, uint message_size,
   if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
     goto err;
 
+  ret = 0;
+
 err:
   if (ret != 0)
     ERR_print_errors_fp(stderr);
@@ -425,7 +425,6 @@ void phase_one(uchar ***commits, uchar ***party_seeds, seed_t salt,
   uint r = params.target_rank;
   uint s = params.first_challenge_size;
   uint lambda = params.lambda;
-  size_t seed_size = (size_t)ceil(lambda / 8.0);
 
   seed_t round_seed, party_seed;
   allocate_seed(&round_seed, lambda);
@@ -509,8 +508,8 @@ void phase_one(uchar ***commits, uchar ***party_seeds, seed_t salt,
   gmp_randclear(prg_state);
 }
 
-void prg_first_challenges(Matrix *challenges, uchar *h1,
-                      SignatureParameters params) {
+void prg_first_challenge(Matrix *challenges, uchar *h1,
+                         SignatureParameters params) {
   uint lambda = params.lambda;
   uint tau = params.tau;
 
@@ -534,17 +533,14 @@ void phase_two(Matrix *challenges, uchar *h1, uchar *message, uint message_size,
                SignatureParameters params, uchar *salt, uchar ***commits) {
   uint lambda = params.lambda;
   uint tau = params.tau;
-
-  seed_t salt_wrap;
-  salt_wrap.size = (size_t)ceil(lambda / 4.0);
-  salt_wrap.data = salt;
+  uint N = params.number_of_parties;
 
   // compute the hash
   EVP_MD_CTX *context;
   initialize_sha3(&context, lambda);
 
-  hash1(h1, context, message, message_size, salt, lambda, tau, tau, commits);
-  prg_first_challenges(challenges, h1, params);
+  hash1(h1, context, message, message_size, salt, lambda, tau, N, commits);
+  prg_first_challenge(challenges, h1, params);
 
   EVP_MD_CTX_free(context);
 }
@@ -557,8 +553,6 @@ void phase_three(Matrix *challenges, MinRankInstance instance,
   uint r = params.target_rank; // rank of the solution
   uint matrix_count = instance.matrix_count;
 
-  MatrixSize size = params.matrix_dimension;
-  uint n = size.n;
   MatrixSize S_size = {s, r};
   Matrix S;
   allocate_matrix(&S, GF_16, S_size);
@@ -580,8 +574,8 @@ void phase_three(Matrix *challenges, MinRankInstance instance,
   clear_matrix(&S);
 }
 
-void prg_second_challenges(uint *challenges, uchar *h2,
-                           SignatureParameters params) {
+void prg_second_challenge(uint *challenges, uchar *h2,
+                          SignatureParameters params) {
   uint lambda = params.lambda;
   uint tau = params.tau;
 
@@ -609,7 +603,6 @@ void phase_four(uchar *h2, uint *second_challenges, uchar *message,
                 uint message_size, seed_t salt, uchar *h1, PartyState **parties,
                 SignatureParameters params) {
   uint lambda = params.lambda;
-  uint tau = params.tau;
 
   // compute the hash
   EVP_MD_CTX *context;
@@ -617,7 +610,7 @@ void phase_four(uchar *h2, uint *second_challenges, uchar *message,
   hash2(h2, message, message_size, salt, h1, parties, context, params);
 
   // generate challenges
-  prg_second_challenges(second_challenges, h2, params);
+  prg_second_challenge(second_challenges, h2, params);
 
   EVP_MD_CTX_free(context);
 }
@@ -626,7 +619,6 @@ void phase_five(uchar *digest, uint digest_size, uint *second_challenges,
                 seed_t salt, uchar *h1, uchar *h2, uchar ***commits,
                 uchar ***party_seeds, PartyState **parties, PartyData **data,
                 SignatureParameters params) {
-  uint lambda = params.lambda;
   uint tau = params.tau;
   uint N = params.number_of_parties;
 
@@ -644,10 +636,11 @@ void phase_five(uchar *digest, uint digest_size, uint *second_challenges,
 
   for (uint round = 0; round < tau; round++) {
     // pack all states
+    uint i_star = second_challenges[round] % N;
     for (uint party = 0; party < N; party++) {
-      if (party != second_challenges[round]) {
+      if (party != i_star) {
         memcpy(&digest[current_index], party_seeds[round][party], seed_size);
-        current_index += hash_size;
+        current_index += seed_size;
         if (party == N) {
           bit_index = current_index << 3;
           pack_matrix(&digest[current_index], data[round][party].alpha,
@@ -657,18 +650,15 @@ void phase_five(uchar *digest, uint digest_size, uint *second_challenges,
           current_index = (uint)ceil(bit_index / 8.0);
         }
       }
-
-      uint i_star = second_challenges[round] % N;
-
-      // pack commit of i_star
-      memcpy(&digest[current_index], commits[round][i_star], hash_size);
-      current_index += hash_size;
-
-      // pack S matrix of i_star
-      bit_index = current_index << 3;
-      pack_matrix(&digest[current_index], parties[round][i_star].S, &bit_index);
-      current_index = (uint)ceil(bit_index / 8.0);
     }
+    // pack commit of i_star
+    memcpy(&digest[current_index], commits[round][i_star], hash_size);
+    current_index += hash_size;
+
+    // pack S matrix of i_star
+    bit_index = current_index << 3;
+    pack_matrix(&digest[current_index], parties[round][i_star].S, &bit_index);
+    current_index = (uint)ceil(bit_index / 8.0);
   }
 
   digest[digest_size] = (uchar)0;
@@ -684,13 +674,12 @@ uint sign(uchar **digest, uchar *message, uint msg_size,
 
   // unpack the MinRank instance and solution from the key pair
   MinRankInstance instance;
-  init_instance(&instance, params.solution_size + 1, params.matrix_dimension);
+  init_instance(&instance, matrix_count, params.matrix_dimension);
   unpack_instance_from_public_key(&instance, prg_state, params,
                                   key_pair.public_key);
 
   MinRankSolution solution;
-  init_solution(&solution, params.solution_size + 1, params.target_rank,
-                params.matrix_dimension);
+  init_solution(&solution, matrix_count, target_rank, params.matrix_dimension);
   unpack_solution_from_private_key(&solution, prg_state, params,
                                    key_pair.private_key);
 
@@ -711,7 +700,7 @@ uint sign(uchar **digest, uchar *message, uint msg_size,
 
   // phase two
   Matrix *challenges;
-  allocate_challenges(&challenges, params);
+  allocate_first_challenge(&challenges, params);
   PartyState **parties;
   allocate_all_parties(&parties, params);
   uchar *h1;
@@ -726,7 +715,7 @@ uint sign(uchar **digest, uchar *message, uint msg_size,
   uchar *h2;
   allocate_commit(&h2, params.lambda);
   uint *second_challenges;
-  allocate_second_challenges(&second_challenges, params);
+  allocate_second_challenge(&second_challenges, params);
 
   phase_four(h2, second_challenges, message, msg_size, salt, h1, parties,
              params);
@@ -742,7 +731,7 @@ uint sign(uchar **digest, uchar *message, uint msg_size,
   clear_all_commits(commits, params);
   clear_all_party_data(data, params);
   clear_all_party_seeds(party_seeds, params);
-  clear_challenges(challenges, params);
+  clear_first_challenge(challenges, params);
   clear_all_parties(parties, params);
   OPENSSL_free(h1);
   OPENSSL_free(h2);
