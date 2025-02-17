@@ -8,9 +8,10 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
 
 void print_digest(uchar *digest, uint digest_size) {
-  printf("digest size: %u\ndigest: ", digest_size);
   for (uint i = 0; i < digest_size; i++) {
     printf("%02x", (uint)digest[i]);
   }
@@ -18,35 +19,24 @@ void print_digest(uchar *digest, uint digest_size) {
 }
 int main(int argc, char **argv) {
   SignatureParameters params = PARAMS_1_A_FAST;
-  /* SignatureParameters params; */
-  /* params.lambda = 4; */
-  /* params.matrix_dimension.m = 3; */
-  /* params.matrix_dimension.n = 3; */
-  /* params.field = GF_16; */
-  /* params.target_rank = 1; */
-  /* params.solution_size = 4; */
-  /* params.first_challenge_size = 2; */
-  /* params.number_of_parties = 2; */
-  /* params.tau = 2; */
 
-  uchar *message = (uchar *)"hello";
-  uint msg_size = 5;
-  printf("message: %s\n\n", message);
+  uchar *message = (uchar *)"test a b c";
+  uint msg_size = strlen(message);
+  printf("message: %s, length: %u\n", message, msg_size);
 
+  clock_t start_time = clock();
   // generate the keys
   PublicPrivateKeyPair key_pair;
   allocate_key_pair(&key_pair, params);
   key_gen(&key_pair, params);
 
-  uchar *digest1, *digest2;
-  uint digest_size1 = sign(&digest1, message, msg_size, key_pair, params);
-  printf("---------------------------------------- first digest\n");
-  print_digest(digest1, digest_size1);
-  printf("\n");
+  uchar *digest;
+  uint digest_size = sign(&digest, message, msg_size, key_pair, params);
 
-  // well, the signature is not deterministic...
-  printf("---------------------------------------- second digest\n");
-  uint digest_size2 = sign(&digest2, message, msg_size, key_pair, params);
-  print_digest(digest2, digest_size2);
-  // turns out `salt, seed` are sampled from /dev/random so everything's cool
+  clock_t end_time = clock();
+  printf("---------------------------------------------------------------------"
+         "-----------\n");
+  print_digest(digest, digest_size);
+  double total_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+  printf("\ndigest size: %u\ntime: %lf s\n", digest_size, total_time);
 }

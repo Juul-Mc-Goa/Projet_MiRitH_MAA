@@ -588,10 +588,11 @@ void prg_second_challenge(uint *challenges, uchar *h2,
   PRG_bytes(prg_state, 4 * tau, random_bytes);
 
   for (uint round = 0; round < tau; round++) {
-    challenges[round] = ((uint)random_bytes[4 * round] << 24) % N;
-    challenges[round] += ((uint)random_bytes[4 * round + 1] << 16) % N;
-    challenges[round] += ((uint)random_bytes[4 * round + 2] << 8) % N;
-    challenges[round] += (uint)random_bytes[4 * round + 3] % N;
+    challenges[round] = (uint)random_bytes[4 * round] << 24;
+    challenges[round] += (uint)random_bytes[4 * round + 1] << 16;
+    challenges[round] += (uint)random_bytes[4 * round + 2] << 8;
+    challenges[round] += (uint)random_bytes[4 * round + 3];
+    challenges[round] %= N;
   }
 
   gmp_randclear(prg_state);
