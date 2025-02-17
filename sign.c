@@ -16,8 +16,11 @@
 #include <stdio.h>
 #include <string.h>
 
+// TODO: actually implement the dependance on lambda
+uint commit_size(uint lambda) { return EVP_MD_get_size(EVP_sha3_256()); }
+
 void allocate_commit(uchar **commit, uint lambda) {
-  *commit = OPENSSL_malloc(EVP_MD_size(EVP_sha3_256()));
+  *commit = OPENSSL_malloc(commit_size(lambda));
 }
 
 void allocate_all_commits(uchar ****commits, SignatureParameters params) {
@@ -31,6 +34,23 @@ void allocate_all_commits(uchar ****commits, SignatureParameters params) {
     commits_value[round] = malloc(sizeof(uchar *) * N);
     for (uint party = 0; party < N; party++) {
       allocate_commit(&commits_value[round][party], lambda);
+    }
+  }
+}
+
+void allocate_all_party_seeds(uchar ****party_seeds,
+                              SignatureParameters params) {
+  uint N = params.number_of_parties;
+  uint tau = params.tau;
+  uint lambda = params.lambda;
+  size_t seed_size = (size_t)ceil(lambda / 8.0);
+
+  *party_seeds = malloc(sizeof(uchar ***) * tau);
+  uchar ***seeds_val = *party_seeds;
+  for (uint round = 0; round < tau; round++) {
+    seeds_val[round] = malloc(sizeof(uchar *) * N);
+    for (uint party = 0; party < N; party++) {
+      seeds_val[round][party] = malloc(sizeof(uchar) * seed_size);
     }
   }
 }
@@ -75,6 +95,10 @@ void allocate_challenges(Matrix **challenges, SignatureParameters params) {
   }
 }
 
+void allocate_second_challenges(uint **challenges, SignatureParameters params) {
+  *challenges = malloc(sizeof(uint) * params.tau);
+}
+
 void allocate_all_parties(PartyState ***parties, SignatureParameters params) {
   uint N = params.number_of_parties;
   uint r = params.target_rank;
@@ -85,15 +109,9 @@ void allocate_all_parties(PartyState ***parties, SignatureParameters params) {
   PartyState **parties_value = *parties;
 
   for (uint round = 0; round < rounds; round++) {
-    printf("round %u\n", round);
     parties_value[round] = malloc(sizeof(PartyState) * N);
     init_parties(parties_value[round], N, s, params.matrix_dimension, r);
   }
-}
-
-void allocate_hash_digest(uchar *digest, uint lambda) {
-  size_t hash_size = (size_t)ceil(lambda / 8.0);
-  digest = malloc(sizeof(uchar) * hash_size);
 }
 
 void allocate_party_seeds(uchar **party_seeds, uint number_of_parties,
@@ -106,17 +124,40 @@ void allocate_party_seeds(uchar **party_seeds, uint number_of_parties,
   }
 }
 
+void allocate_signature_digest(uchar **digest, uint *second_challenges,
+                               SignatureParameters params) {
+  uint lambda = params.lambda;
+  uint n = params.matrix_dimension.n;
+  uint r = params.target_rank;
+  uint s = params.first_challenge_size;
+  uint tau = params.tau;
+  uint N = params.number_of_parties;
+
+  uint seed_size = (uint)ceil(lambda / 8.0);
+  uint salt_size = seed_size << 1;
+  uint hash_size = commit_size(lambda);
+  uint alpha_length = params.solution_size + 1;
+  uint K_length = r * (n - r);
+  uint C_length = s * (n - r);
+
+  uint total_size = salt_size + 2 * hash_size;
+
+  for (uint i = 0; i < tau; i++) {
+    total_size += (N - 1) * seed_size;
+    // last party has a different state
+    if (second_challenges[i] != N)
+      total_size += alpha_length + K_length + C_length;
+  }
+
+  *digest = malloc(sizeof(uchar) * total_size);
+}
+
 void initialize_sha3(EVP_MD_CTX **ctx, uint lambda) {
   *ctx = EVP_MD_CTX_new();
   EVP_MD_CTX *ctx_value = *ctx;
   if (ctx_value == NULL)
     goto err;
 
-  /*
-   * Fetch the KECCAK algorithm implementation for doing the digest.
-   * - first NULL param: use the "default" library context
-   * - second NULL param: no particular criteria for the implementation
-   */
   /* Initialise the digest operation */
   if (!EVP_DigestInit_ex(ctx_value, EVP_sha3_256(), NULL))
     goto err;
@@ -225,28 +266,20 @@ int hash1(uchar *digest, EVP_MD_CTX *context, uchar *message, uint message_size,
   // pass `message` to the context
   if (!EVP_DigestUpdate(context, message, message_size))
     goto err;
-  // reinit the hash context
-  if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
-    goto err;
-
   // pass `msg` to the context
   if (!EVP_DigestUpdate(context, salt, salt_size))
     goto err;
-  // reinit the hash context
-  if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
-    goto err;
-
+  //
   // pass `commit` to the context
   for (uint i = 0; i < number_of_rounds; i++) {
     for (uint j = 0; j < number_of_parties; j++) {
-      if (!EVP_DigestUpdate(context, commits[i][j], sizeof(commits[i][j])))
-        goto err;
-      // reinit the hash context
-      if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
+      if (!EVP_DigestUpdate(context, commits[i][j], commit_size(lambda)))
         goto err;
     }
   }
-
+  // compute the hash
+  if (!EVP_DigestFinal_ex(context, digest, NULL))
+    goto err;
   // reinit the hash context
   if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
     goto err;
@@ -257,15 +290,56 @@ err:
   return ret;
 }
 
-void hash2(uchar *msg, uint msg_size) {
-  // TODO
+void hash2(uchar *digest, uchar *message, uint message_size, seed_t salt,
+           uchar *h1, PartyState **parties, EVP_MD_CTX *context,
+           SignatureParameters params) {
+  uint lambda = params.lambda;
+  uint tau = params.tau;
+  uint N = params.number_of_parties;
+  uint s = params.first_challenge_size;
+  uint r = params.target_rank;
+  uint n = params.matrix_dimension.n;
+
+  int ret = 1;
+  // `salt` has 2 * lambda booleans, packed into lambda / 4 `uchar`s
+  uint salt_size = ceil(lambda / 4.0);
+
+  // pass `message` to the context
+  if (!EVP_DigestUpdate(context, message, message_size))
+    goto err;
+
+  // pass `salt` to the context
+  if (!EVP_DigestUpdate(context, salt.data, salt_size))
+    goto err;
+
+  // pass `h1` to the context
+  if (!EVP_DigestUpdate(context, h1, salt_size))
+    goto err;
+
+  // pass `S, V` to the context
+  // size of S: (s, r)
+  // size of V: (s, n - r)
+  uint total_size = tau * N * (s * r) * (s * (n - r));
+  uchar *packed_matrices = malloc(sizeof(uchar) * total_size);
+  pack_all_S_and_V(packed_matrices, parties, tau, N);
+
+  // compute the hash
+  if (!EVP_DigestFinal_ex(context, digest, NULL))
+    goto err;
+  // reinit the hash context
+  if (!EVP_DigestInit_ex2(context, EVP_sha3_256(), NULL))
+    goto err;
+
+err:
+  if (ret != 0)
+    ERR_print_errors_fp(stderr);
 }
 
 /* Phase one: generate `params.tau` instances of the MPC protocol. The
  * result is stored in `commits`: a 2D array of SHA3 digests. */
-void phase_one(uchar ***commits, seed_t salt, PartyData **data,
-               SignatureParameters params, MinRankInstance instance,
-               MinRankSolution solution) {
+void phase_one(uchar ***commits, uchar ***party_seeds, seed_t salt,
+               PartyData **data, SignatureParameters params,
+               MinRankInstance instance, MinRankSolution solution) {
   // unpack `params`
   uint N = params.number_of_parties;
   uint r = params.target_rank;
@@ -302,11 +376,6 @@ void phase_one(uchar ***commits, seed_t salt, PartyData **data,
   allocate_matrix(&A, GF_16, A_size);
   generate_random_matrix(&A, prg_state, GF_16);
 
-  uchar **party_seeds = malloc(sizeof(uchar *) * N);
-  for (uint i = 0; i < N; i++) {
-    party_seeds[i] = malloc(sizeof(uchar) * seed_size);
-  }
-
   for (uint round = 0; round < params.tau; round++) {
     fill_matrix_with_zero(&A_sum);
     fill_matrix_with_zero(&alpha_sum);
@@ -314,10 +383,10 @@ void phase_one(uchar ***commits, seed_t salt, PartyData **data,
     fill_matrix_with_zero(&C_sum);
 
     generate_seed(round_seed);
-    TreePRG(&salt, &round_seed, (size_t)lambda, N, party_seeds);
+    TreePRG(&salt, &round_seed, (size_t)lambda, N, party_seeds[round]);
 
     for (uint party = 0; party < N - 1; party++) {
-      party_seed.data = party_seeds[party];
+      party_seed.data = party_seeds[round][party];
       PRG_init(&salt, &party_seed, lambda, &prg_state);
       generate_random_matrix(&data[round][party].A, prg_state, GF_16);
       generate_random_matrix(&data[round][party].alpha, prg_state, GF_16);
@@ -334,7 +403,7 @@ void phase_one(uchar ***commits, seed_t salt, PartyData **data,
             party_seed);
     }
     // last party is special
-    party_seed.data = party_seeds[N - 1];
+    party_seed.data = party_seeds[round][N - 1];
     PRG_init(&salt, &party_seed, lambda, &prg_state);
     generate_random_matrix(&data[round][N - 1].A, prg_state, GF_16);
     generate_random_matrix(&data[round][N - 1].alpha, prg_state, GF_16);
@@ -409,7 +478,6 @@ void phase_three(Matrix *challenges, MinRankInstance instance,
                       data[round][party].alpha, matrix_count);
       compute_local_s(&parties[round][party], challenges[round],
                       data[round][party].A);
-      print_matrix(&parties[round][party].S);
     }
     compute_global_s(&S, parties[round], N);
     for (uint party = 0; party < N; party++) {
@@ -419,12 +487,56 @@ void phase_three(Matrix *challenges, MinRankInstance instance,
   }
 }
 
-void phase_four() {
-  // TODO :(
+void phase_four(uchar *h2, uint *second_challenges, uchar *message,
+                uint message_size, seed_t salt, uchar *h1, PartyState **parties,
+                SignatureParameters params) {
+  uint lambda = params.lambda;
+  uint tau = params.tau;
+
+  // compute the hash
+  EVP_MD_CTX *context;
+  initialize_sha3(&context, lambda);
+  hash2(h2, message, message_size, salt, h1, parties, context, params);
+
+  // generate challenges
+  gmp_randstate_t prg_state;
+  gmp_randinit_default(prg_state);
+  seed_t h2_wrap = {commit_size(lambda), h2};
+  PRG_init(&h2_wrap, NULL, lambda, &prg_state);
+
+  uchar *random_bytes = malloc(sizeof(uchar) * 4 * tau);
+  PRG_bytes(prg_state, 4 * tau, random_bytes);
+
+  for (uint round = 0; round < tau; round++) {
+    second_challenges[round] = ((uint)random_bytes[4 * round] << 24);
+    second_challenges[round] += ((uint)random_bytes[4 * round + 1] << 16);
+    second_challenges[round] += ((uint)random_bytes[4 * round + 2] << 8);
+    second_challenges[round] += (uint)random_bytes[4 * round + 3];
+  }
 }
 
-void sign(uchar *digest, MinRankInstance instance, MinRankSolution solution,
-          uchar *message, uint msg_size, SignatureParameters params) {
+void phase_five(uchar *digest, uchar *h1, uchar *h2, uchar ***commits) {}
+
+void sign(uchar *digest, uchar *message, uint msg_size,
+          PublicPrivateKeyPair key_pair, SignatureParameters params) {
+  uint matrix_count = params.solution_size + 1;
+  uint target_rank = params.target_rank;
+  uint digest_size = commit_size(params.lambda);
+
+  gmp_randstate_t prg_state;
+  gmp_randinit_default(prg_state);
+
+  // unpack instance and solution from key pair
+  MinRankSolution solution;
+  init_solution(&solution, matrix_count, target_rank, params.matrix_dimension);
+  unpack_solution_from_private_key(&solution, prg_state, params,
+                                   key_pair.private_key);
+
+  MinRankInstance instance;
+  init_instance(&instance, matrix_count, params.matrix_dimension);
+  unpack_instance_from_public_key(&instance, prg_state, params,
+                                  key_pair.public_key);
+
   uchar ***commits;
   allocate_all_commits(&commits, params);
 
@@ -436,56 +548,26 @@ void sign(uchar *digest, MinRankInstance instance, MinRankSolution solution,
   allocate_seed(&salt, 2 * params.lambda);
   generate_seed(salt);
 
-  phase_one(commits, salt, data, params, instance, solution);
+  uchar ***party_seeds;
+  allocate_all_party_seeds(&party_seeds, params);
+  phase_one(commits, party_seeds, salt, data, params, instance, solution);
 
   Matrix *challenges;
   allocate_challenges(&challenges, params);
   PartyState **parties;
   allocate_all_parties(&parties, params);
   uchar *h1;
-  allocate_hash_digest(h1, params.lambda);
+  allocate_commit(&h1, params.lambda);
 
   phase_two(challenges, h1, message, msg_size, params, salt.data, commits);
   phase_three(challenges, instance, parties, data, params);
-  /* phase_four(message, salt, h1); */
+
+  uchar *h2;
+  allocate_commit(&h2, params.lambda);
+  uint *second_challenges;
+  allocate_second_challenges(&second_challenges, params);
+  phase_four(h2, second_challenges, message, msg_size, salt, h1, parties,
+             params);
+
+  // phase five
 }
-
-/* Phase 3 of signing
- *
- * Given as input:
- * - the public key 'M';
- * - the secret key 'E';
- * - the matrix 'A';
- * - the additive shares 'A_shr', 'C_shr', 'a_shr', 'K_shr';
- * computes and hashes the additive shares 'S_shr', 'V_shr'.
- * The matrix 'S_shr[i]' is written over 'A_shr'. */
-/* void sign_phase3(uint8_t M[K + 1][matrix_bytes_size(M, N)], */
-/*                  uint8_t E[matrix_bytes_size(M, N)], */
-/*                  uint8_t A[matrix_bytes_size(S, R)], */
-/*                  uint8_t A_shr[N_PARTIES][matrix_bytes_size(S, R)], */
-/*                  uint8_t C_shr[N_PARTIES][matrix_bytes_size(S, N - R)], */
-/*                  uint8_t a_shr[N_PARTIES][matrix_bytes_size(K, 1)], */
-/*                  uint8_t K_shr[N_PARTIES][matrix_bytes_size(R, N - R)], */
-/*                  uint8_t R[matrix_bytes_size(S, M)]) { */
-/*   // MPC (Multi-Party Computation) implementation goes here */
-/* } */
-
-/* Phase 4 of signing
- *
- * Given as input:
- * - the hash hash2;
- * computes the challenge i_star */
-/* void sign_phase4(uint32_t i_star[TAU], const hash_t hash2) { */
-/*   size_t l; */
-/*   prng_t prng; */
-
-/*   // Initialize PRNG from 'hash2' */
-/*   prng_init(&prng, hash2, NULL); */
-
-/*   for (l = 0; l < TAU; l++) { */
-/*     uint32_t r; */
-/*     // Generate random number and compute i_star[l] */
-/*     prng_bytes(&prng, &r, sizeof(r)); */
-/*     i_star[l] = r % N_PARTIES; */
-/*   } */
-/* } */

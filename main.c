@@ -54,8 +54,11 @@ int main(int argc, char **argv) {
   seed_t salt;
   allocate_seed(&salt, 2 * params.lambda);
   generate_seed(salt);
+  uchar ***party_seeds;
+  allocate_all_party_seeds(&party_seeds, params);
 
-  phase_one(commits, salt, data, params, instance, solution);
+  phase_one(commits, party_seeds, salt, data, params, instance, solution);
+  printf("completed phase one\n");
 
   Matrix *challenges;
   allocate_challenges(&challenges, params);
@@ -63,13 +66,19 @@ int main(int argc, char **argv) {
   PartyState **parties;
   allocate_all_parties(&parties, params);
   uchar *h1;
-  allocate_hash_digest(h1, params.lambda);
+  allocate_commit(&h1, params.lambda);
 
-  printf("allocated challenges, h1, parties\n");
 
   phase_two(challenges, h1, message, msg_size, params, salt.data, commits);
   printf("completed phase two\n");
   phase_three(challenges, instance, parties, data, params);
   printf("completed phase three\n");
-  // TODO: Apply phase_two, phase_three, phase_four
+
+  uchar *h2;
+  allocate_commit(&h2, params.lambda);
+  uint *second_challenges;
+  allocate_second_challenges(&second_challenges, params);
+  phase_four(h2, second_challenges, message, msg_size, salt, h1, parties,
+             params);
+  printf("completed phase four\n");
 }
