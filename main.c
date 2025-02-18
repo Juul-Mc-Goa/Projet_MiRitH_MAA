@@ -18,6 +18,7 @@ void print_digest(uchar *digest, uint digest_size) {
   printf("\n");
 }
 int main(int argc, char **argv) {
+  /* SignatureParameters params = PARAMS_1_A_SHORT; */
   SignatureParameters params = PARAMS_1_A_FAST;
 
   uchar *message = (uchar *)"test a b c";
@@ -38,5 +39,7 @@ int main(int argc, char **argv) {
          "-----------\n");
   print_digest(digest, digest_size);
   double total_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-  printf("\ndigest size: %u\ntime: %lf s\n", digest_size, total_time);
+  printf("\ndigest size: %u\n", digest_size);
+  printf("time: %lf s\n", total_time);
+  printf("clock cycles: %ld\n", end_time - start_time);
 }

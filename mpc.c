@@ -32,7 +32,7 @@ void share_alpha_and_update(Matrix alpha, gmp_randstate_t random_state,
   }
 
   // last share must be `alpha - sum`
-  matrix_opposite(&alpha_sum);
+  /* matrix_opposite(&alpha_sum); */
   matrix_sum(&local_alpha, alpha_sum, alpha);
   compute_local_m(&parties[number_of_parties - 1], instance, local_alpha,
                   matrix_count);
@@ -57,7 +57,7 @@ void share_a_and_update(Matrix A, Matrix R, gmp_randstate_t random_state,
   }
 
   // last party has share `A - A_sum`
-  matrix_opposite(&A_sum);
+  /* matrix_opposite(&A_sum); */
   matrix_sum(&local_A, A, A_sum);
 
   compute_local_s(&parties[number_of_parties - 1], R, local_A);
@@ -90,8 +90,8 @@ void share_c_k_and_update(Matrix C, Matrix K, Matrix R, Matrix S,
     compute_local_v(&parties[i], S, local_K, R, local_C);
   }
 
-  matrix_opposite(&C_sum);
-  matrix_opposite(&K_sum);
+  /* matrix_opposite(&C_sum); */
+  /* matrix_opposite(&K_sum); */
   matrix_sum(&local_C, C, C_sum);
   matrix_sum(&local_K, K, K_sum);
   compute_local_v(&parties[number_of_parties - 1], S, local_K, R, local_C);
@@ -281,11 +281,11 @@ void compute_local_v(PartyState *state, Matrix global_S, Matrix local_K,
   matrix_product(&temp, R, state->M_left);
 
   // V -= R*M_left
-  matrix_opposite(&temp);
+  /* matrix_opposite(&temp); */
   matrix_sum(&state->V, state->V, temp);
 
   // V -= C
-  matrix_opposite(&local_C);
+  /* matrix_opposite(&local_C); */
   matrix_sum(&state->V, state->V, local_C);
 
   clear_matrix(&temp);
